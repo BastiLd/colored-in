@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabaseConfig, supabaseConfigError } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,12 +70,25 @@ function isTemporaryEmail(email: string): boolean {
   return suspiciousPatterns.some(pattern => pattern.test(domain));
 }
 
+function getSupabaseProjectRef(url?: string | null) {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname; // <ref>.supabase.co
+    return host.split(".")[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const showDebug =
+    import.meta.env.DEV || new URLSearchParams(window.location.search).has("debug");
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -96,6 +109,11 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (supabaseConfigError) {
+      toast.error(supabaseConfigError);
+      return;
+    }
+
     if (!email || !password) {
       toast.error("Please fill in all fields");
       return;
@@ -123,11 +141,12 @@ export default function Auth() {
         if (error) throw error;
         toast.success("Welcome back!");
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            emailRedirectTo: `${window.location.origin}/`,
+            // Works for both local dev and GitHub Pages base paths
+            emailRedirectTo: `${window.location.origin}${import.meta.env.BASE_URL}`,
           },
         });
         if (error) {
@@ -137,9 +156,12 @@ export default function Auth() {
           } else {
             throw error;
           }
-        } else {
-          toast.success("Account created! You can now use AI palette generation.");
+        } else if (data.session) {
+          toast.success("Account created! You're signed in.");
           navigate("/");
+        } else {
+          // Email confirmation flow: user exists but no session yet.
+          toast.success("Account created! Please check your email to confirm your account.");
         }
       }
     } catch (error: any) {
@@ -233,6 +255,30 @@ export default function Auth() {
               ← Back to home
             </button>
           </div>
+
+          {showDebug && (
+            <div className="mt-6 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+              <div className="font-medium text-foreground mb-1">Debug (Supabase)</div>
+              <div>
+                Project ref:{" "}
+                <span className="font-mono text-foreground">
+                  {getSupabaseProjectRef(supabaseConfig.url) ?? "(missing/invalid)"}
+                </span>
+              </div>
+              <div>
+                URL: <span className="font-mono">{supabaseConfig.url ?? "(missing)"}</span>
+              </div>
+              <div>
+                Key: <span className="font-mono">{supabaseConfig.keyPreview ?? "(missing)"}</span>
+              </div>
+              <div>
+                BASE_URL: <span className="font-mono">{import.meta.env.BASE_URL}</span>
+              </div>
+              {supabaseConfigError && (
+                <div className="mt-2 text-destructive">{supabaseConfigError}</div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
