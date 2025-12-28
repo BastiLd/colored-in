@@ -10,13 +10,18 @@ import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
+const RAW_BASE_URL = import.meta.env.BASE_URL;
+// Vite's BASE_URL often ends with a trailing slash (e.g. "/colored-in/").
+// React Router basename matching is more reliable without it.
+const BASENAME =
+  RAW_BASE_URL === "/" ? "/" : RAW_BASE_URL.replace(/\/$/, "");
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Sonner />
       {/* Important for GitHub Pages: app is served from /colored-in/ */}
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <BrowserRouter basename={BASENAME}>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
