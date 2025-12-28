@@ -26,8 +26,11 @@ function AnimatedTitle() {
     timeout: NodeJS.Timeout | null;
   }>>(new Map());
   const [exploded, setExploded] = useState(false);
+  const [explodeActive, setExplodeActive] = useState(false);
   const [flyingBack, setFlyingBack] = useState(false);
   const charRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const explosionCycleRef = useRef(0);
+  const explodeParamsRef = useRef<Map<number, { x: number; y: number; rotation: number }>>(new Map());
 
   // Get blue/yellow color
   const getRandomColor = () => {
@@ -76,13 +79,42 @@ function AnimatedTitle() {
   const coloredCount = Array.from(charStates.entries()).filter(([idx, state]) => text[idx] !== " " && state.colored).length;
   useEffect(() => {
     if (coloredCount >= nonSpaceChars.length && !exploded && coloredCount > 0) {
+      explosionCycleRef.current += 1;
+      explodeParamsRef.current = new Map();
+      setExplodeActive(false);
+      // Precompute stable explosion params for this cycle (so letters actually "fly" instead of jumping around).
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] === " ") continue;
+        const base = explosionCycleRef.current * 1000 + i * 123.456;
+        const frac = (n: number) => {
+          const x = Math.sin(n) * 10000;
+          return x - Math.floor(x);
+        };
+        const rand = (salt: number, min: number, max: number) =>
+          min + frac(base + salt) * (max - min);
+
+        // "Before change" feel: moderate distances + rotation, no scaling, fixed duration handled by CSS transition.
+        const angle = rand(1.1, 0, 360);
+        const distance = rand(2.2, 200, 600);
+        const x = Math.cos(angle * Math.PI / 180) * distance;
+        const y = Math.sin(angle * Math.PI / 180) * distance;
+        const rotation = rand(3.3, -360, 360);
+        explodeParamsRef.current.set(i, { x, y, rotation });
+      }
+
       setExploded(true);
+      // Ensure the browser paints the "pre-explode" frame (opacity 1, transform none)
+      // before we apply the flying transform. This prevents "teleporting".
+      requestAnimationFrame(() => {
+        setExplodeActive(true);
+      });
 
       // Fly back after 5 seconds
       setTimeout(() => {
         setFlyingBack(true);
         setTimeout(() => {
           setExploded(false);
+          setExplodeActive(false);
           setFlyingBack(false);
           setCharStates(new Map());
         }, 800);
@@ -91,34 +123,31 @@ function AnimatedTitle() {
   }, [coloredCount, nonSpaceChars.length, exploded]);
   const getExplosionStyle = (index: number): React.CSSProperties => {
     if (!exploded) return {};
+    if (text[index] === " ") return {};
     
-    // Seed randomness based on character index for consistency
-    const seed = index * 123.456;
-    const random = (min: number, max: number) => {
-      const x = Math.sin(seed) * 10000;
-      return min + (x - Math.floor(x)) * (max - min);
-    };
-    
-    const angle = random(0, 360);
-    const distance = random(150, 900); // Much wider range for dramatic effect
-    const x = Math.cos(angle * Math.PI / 180) * distance;
-    const y = Math.sin(angle * Math.PI / 180) * distance;
-    const rotation = random(-1080, 1080); // More spinning
-    const scale = random(0.3, 0.8); // Scale down as they fly
-    const duration = random(0.4, 0.8); // Varied timing per character
+    const p = explodeParamsRef.current.get(index);
+    // Fallback (shouldn't happen): keep it sane and consistent.
+    const x = p?.x ?? 300;
+    const y = p?.y ?? 0;
+    const rotation = p?.rotation ?? 0;
     
     if (flyingBack) {
       return {
-        transform: `translate(0, 0) rotate(0deg) scale(1)`,
+        transform: `translate(0, 0) rotate(0deg)`,
         opacity: 1,
-        transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)"
       };
     }
     
+    if (!explodeActive) {
+      return {
+        transform: `translate(0, 0) rotate(0deg)`,
+        opacity: 1,
+      };
+    }
+
     return {
-      transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${scale})`,
+      transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
       opacity: 0,
-      transition: `all ${duration}s cubic-bezier(0.6, -0.28, 0.735, 0.045)`
     };
   };
   return <div className="font-display">
@@ -135,7 +164,10 @@ function AnimatedTitle() {
                 ${!isSpace && !exploded && !isColored ? "hover:animate-shake" : ""}
               `} style={{
           color: isColored ? getRandomColor() : "#FFFFFF",
-          transition: isColored ? "color 0.2s ease" : "color 0.5s ease 0.1s",
+          // Keep transform/opacity transitions ALWAYS active to prevent "teleporting"
+          // when we toggle exploded/flyingBack (otherwise transition+transform change in same frame may not animate).
+          transition: `${isColored ? "color 0.2s ease" : "color 0.5s ease 0.1s"}, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)`,
+          willChange: "transform, opacity",
           ...getExplosionStyle(i)
         }} onMouseEnter={() => handleMouseEnter(i, char)}>
               {char === " " ? "\u00A0" : char}
