@@ -13,7 +13,7 @@ The dev server runs on `http://localhost:8080` (see `vite.config.ts`).
 
 ## Environment variables (Supabase)
 
-Create a local file `.env.local` (not committed) with:
+Copy `env.example` to a local file `.env.local` (not committed) and fill in:
 
 ```env
 VITE_SUPABASE_URL=YOUR_SUPABASE_PROJECT_URL
