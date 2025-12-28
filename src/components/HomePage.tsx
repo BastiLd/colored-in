@@ -91,22 +91,34 @@ function AnimatedTitle() {
   }, [coloredCount, nonSpaceChars.length, exploded]);
   const getExplosionStyle = (index: number): React.CSSProperties => {
     if (!exploded) return {};
-    const angle = Math.random() * 360;
-    const distance = 200 + Math.random() * 400;
+    
+    // Seed randomness based on character index for consistency
+    const seed = index * 123.456;
+    const random = (min: number, max: number) => {
+      const x = Math.sin(seed) * 10000;
+      return min + (x - Math.floor(x)) * (max - min);
+    };
+    
+    const angle = random(0, 360);
+    const distance = random(150, 900); // Much wider range for dramatic effect
     const x = Math.cos(angle * Math.PI / 180) * distance;
     const y = Math.sin(angle * Math.PI / 180) * distance;
-    const rotation = Math.random() * 720 - 360;
+    const rotation = random(-1080, 1080); // More spinning
+    const scale = random(0.3, 0.8); // Scale down as they fly
+    const duration = random(0.4, 0.8); // Varied timing per character
+    
     if (flyingBack) {
       return {
-        transform: `translate(0, 0) rotate(0deg)`,
+        transform: `translate(0, 0) rotate(0deg) scale(1)`,
         opacity: 1,
         transition: "all 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)"
       };
     }
+    
     return {
-      transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
+      transform: `translate(${x}px, ${y}px) rotate(${rotation}deg) scale(${scale})`,
       opacity: 0,
-      transition: "all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)"
+      transition: `all ${duration}s cubic-bezier(0.6, -0.28, 0.735, 0.045)`
     };
   };
   return <div className="font-display">
@@ -119,7 +131,8 @@ function AnimatedTitle() {
           charRefs.current[i] = el;
         }} className={`
                 inline-block transition-all cursor-default
-                ${!isSpace && !exploded ? "hover:animate-wiggle" : ""}
+                ${!isSpace && !exploded && isColored ? "animate-shake" : ""}
+                ${!isSpace && !exploded && !isColored ? "hover:animate-shake" : ""}
               `} style={{
           color: isColored ? getRandomColor() : "#FFFFFF",
           transition: isColored ? "color 0.2s ease" : "color 0.5s ease 0.1s",
