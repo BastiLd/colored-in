@@ -99,6 +99,10 @@ const plans: Plan[] = [
   },
 ];
 
+// Temporary safety switch: checkout is currently blocked by the backend ("Invalid JWT" from Edge Functions).
+// We disable paid-plan CTAs until the Supabase auth / Edge Function config is fixed.
+const CHECKOUT_ENABLED = false;
+
 interface PlanCardProps {
   plan: Plan;
   isActive: boolean;
@@ -110,7 +114,8 @@ interface PlanCardProps {
 
 function PlanCard({ plan, isActive, onSubscribe, isLoading, loadingPlan, isLoggedIn }: PlanCardProps) {
   const isThisLoading = isLoading && loadingPlan === plan.planKey;
-  const isDisabled = isActive || (isLoading && loadingPlan !== plan.planKey);
+  const isCheckoutDisabled = !CHECKOUT_ENABLED && plan.planKey !== "free" && !isActive;
+  const isDisabled = isActive || isCheckoutDisabled || (isLoading && loadingPlan !== plan.planKey);
   
   return (
     <div
@@ -192,6 +197,10 @@ function PlanCard({ plan, isActive, onSubscribe, isLoading, loadingPlan, isLogge
         disabled={isDisabled || plan.planKey === "free"}
         onClick={() => {
           if (!isActive && plan.planKey !== "free") {
+            if (isCheckoutDisabled) {
+              toast.info("Payments are temporarily disabled — we’re working on it.");
+              return;
+            }
             onSubscribe(plan.planKey);
           }
         }}
@@ -205,6 +214,8 @@ function PlanCard({ plan, isActive, onSubscribe, isLoading, loadingPlan, isLogge
           "Current Plan"
         ) : plan.planKey === "free" ? (
           isLoggedIn ? "Free Plan" : "Sign up free"
+        ) : isCheckoutDisabled ? (
+          "We are working on it!"
         ) : (
           plan.buttonText
         )}
@@ -270,29 +281,8 @@ export default function Pricing() {
         return;
       }
 
-      // Call the create-checkout Edge Function
-      const response = await supabase.functions.invoke("create-checkout", {
-        body: {
-          planKey,
-          successUrl: `${window.location.origin}/dashboard?checkout=success`,
-          cancelUrl: `${window.location.origin}/pricing?checkout=canceled`,
-        },
-      });
-
-      if (response.error) {
-        console.error("Checkout error:", response.error);
-        toast.error(response.error.message || "Failed to start checkout. Please try again.");
-        return;
-      }
-
-      const { url } = response.data;
-
-      if (url) {
-        // Redirect to Stripe Checkout
-        window.location.href = url;
-      } else {
-        toast.error("Failed to create checkout session. Please try again.");
-      }
+      toast.info("Payments are temporarily disabled — we’re working on it.");
+      return;
     } catch (error) {
       console.error("Subscription error:", error);
       toast.error("Something went wrong. Please try again.");
