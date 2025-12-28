@@ -15,5 +15,5 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: '/colored-in/',
+  base: mode === 'production' ? '/colored-in/' : '/',
 }));
