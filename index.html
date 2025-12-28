@@ -7,6 +7,23 @@
     <meta name="description" content="Beautiful color palettes for your creative projects" />
     <meta name="author" content="Basti" />
 
+    <!-- GitHub Pages SPA fallback (pairs with /public/404.html) -->
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var p = params.get("p");
+        if (!p) return;
+        params.delete("p");
+        var cleanSearch = params.toString();
+        var newUrl =
+          window.location.origin +
+          window.location.pathname +
+          decodeURIComponent(p) +
+          (cleanSearch ? "?" + cleanSearch : "");
+        window.history.replaceState(null, "", newUrl);
+      })();
+    </script>
+
     <meta property="og:title" content="Colored In" />
     <meta property="og:description" content="Beautiful color palettes for your creative projects" />
     <meta property="og:type" content="website" />
