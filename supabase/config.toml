@@ -1,0 +1,5 @@
+project_id = "gyamzodmclsukpzrtjdh"
+
+[functions.generate-palette]
+# SECURITY: JWT verification is required for production to prevent unauthorized access
+verify_jwt = true
