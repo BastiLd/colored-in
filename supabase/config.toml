@@ -3,3 +3,12 @@ project_id = "gyamzodmclsukpzrtjdh"
 [functions.generate-palette]
 # SECURITY: JWT verification is required for production to prevent unauthorized access
 verify_jwt = true
+
+[functions.create-checkout]
+# Requires authentication - users must be logged in to create a checkout session
+verify_jwt = true
+
+[functions.stripe-webhook]
+# Webhooks come directly from Stripe, not authenticated users
+# Security is handled via webhook signature verification in the function
+verify_jwt = false

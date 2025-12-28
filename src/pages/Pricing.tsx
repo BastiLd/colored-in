@@ -1,8 +1,9 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Check, Sparkles, Zap, Crown, Rocket, ArrowLeft } from "lucide-react";
+import { Check, Sparkles, Zap, Crown, Rocket, ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface PlanFeature {
   text: string;
@@ -98,7 +99,19 @@ const plans: Plan[] = [
   },
 ];
 
-function PlanCard({ plan, isActive }: { plan: Plan; isActive: boolean }) {
+interface PlanCardProps {
+  plan: Plan;
+  isActive: boolean;
+  onSubscribe: (planKey: string) => void;
+  isLoading: boolean;
+  loadingPlan: string | null;
+  isLoggedIn: boolean;
+}
+
+function PlanCard({ plan, isActive, onSubscribe, isLoading, loadingPlan, isLoggedIn }: PlanCardProps) {
+  const isThisLoading = isLoading && loadingPlan === plan.planKey;
+  const isDisabled = isActive || (isLoading && loadingPlan !== plan.planKey);
+  
   return (
     <div
       className={`relative rounded-2xl border ${
@@ -176,9 +189,25 @@ function PlanCard({ plan, isActive }: { plan: Plan; isActive: boolean }) {
             : ""
         }`}
         variant={isActive ? "default" : plan.planKey === "free" ? "secondary" : "default"}
-        disabled={isActive}
+        disabled={isDisabled || plan.planKey === "free"}
+        onClick={() => {
+          if (!isActive && plan.planKey !== "free") {
+            onSubscribe(plan.planKey);
+          }
+        }}
       >
-        {isActive ? "Current Plan" : plan.buttonText}
+        {isThisLoading ? (
+          <>
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            Processing...
+          </>
+        ) : isActive ? (
+          "Current Plan"
+        ) : plan.planKey === "free" ? (
+          isLoggedIn ? "Free Plan" : "Sign up free"
+        ) : (
+          plan.buttonText
+        )}
       </Button>
     </div>
   );
@@ -186,8 +215,11 @@ function PlanCard({ plan, isActive }: { plan: Plan; isActive: boolean }) {
 
 export default function Pricing() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [userPlan, setUserPlan] = useState<string>("free");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -210,7 +242,65 @@ export default function Pricing() {
       }
     };
     checkUser();
-  }, []);
+
+    // Check for checkout status from URL
+    const checkoutStatus = searchParams.get("checkout");
+    if (checkoutStatus === "canceled") {
+      toast.info("Checkout was canceled. You can try again anytime.");
+    }
+  }, [searchParams]);
+
+  const handleSubscribe = async (planKey: string) => {
+    // If not logged in, redirect to auth
+    if (!isLoggedIn) {
+      toast.info("Please sign in to subscribe to a plan.");
+      navigate("/auth");
+      return;
+    }
+
+    setIsLoading(true);
+    setLoadingPlan(planKey);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("Please sign in to continue.");
+        navigate("/auth");
+        return;
+      }
+
+      // Call the create-checkout Edge Function
+      const response = await supabase.functions.invoke("create-checkout", {
+        body: {
+          planKey,
+          successUrl: `${window.location.origin}/dashboard?checkout=success`,
+          cancelUrl: `${window.location.origin}/pricing?checkout=canceled`,
+        },
+      });
+
+      if (response.error) {
+        console.error("Checkout error:", response.error);
+        toast.error(response.error.message || "Failed to start checkout. Please try again.");
+        return;
+      }
+
+      const { url } = response.data;
+
+      if (url) {
+        // Redirect to Stripe Checkout
+        window.location.href = url;
+      } else {
+        toast.error("Failed to create checkout session. Please try again.");
+      }
+    } catch (error) {
+      console.error("Subscription error:", error);
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setLoadingPlan(null);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -269,7 +359,15 @@ export default function Pricing() {
       <div className="container mx-auto px-6 pb-20">
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {plans.map((plan) => (
-            <PlanCard key={plan.name} plan={plan} isActive={userPlan === plan.planKey} />
+            <PlanCard
+              key={plan.name}
+              plan={plan}
+              isActive={userPlan === plan.planKey}
+              onSubscribe={handleSubscribe}
+              isLoading={isLoading}
+              loadingPlan={loadingPlan}
+              isLoggedIn={isLoggedIn}
+            />
           ))}
         </div>
 

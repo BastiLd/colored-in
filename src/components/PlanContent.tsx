@@ -1,6 +1,7 @@
-import { Check, Sparkles, Zap, Crown, Rocket } from "lucide-react";
+import { Check, Sparkles, Zap, Crown, Rocket, Calendar, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface PlanInfo {
   name: string;
@@ -50,6 +51,8 @@ interface PlanContentProps {
   profile: {
     email: string | null;
     plan: string;
+    is_active?: boolean;
+    expires_at?: string | null;
   } | null;
   generationCount: number;
   lastGeneration: string | null;
@@ -58,8 +61,12 @@ interface PlanContentProps {
 export const PlanContent = ({ profile, generationCount, lastGeneration }: PlanContentProps) => {
   const navigate = useNavigate();
   const userPlan = profile?.plan ?? "free";
+  const isActive = profile?.is_active ?? true;
+  const expiresAt = profile?.expires_at;
   const currentPlanInfo = plans.find((p) => p.key === userPlan);
   const showSummary = userPlan === "ultra" || userPlan === "individual";
+  const isPaidPlan = userPlan !== "free";
+  const userPlanIndex = plans.findIndex((p) => p.key === userPlan);
 
   return (
     <div className="p-8">
@@ -82,9 +89,15 @@ export const PlanContent = ({ profile, generationCount, lastGeneration }: PlanCo
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold">{currentPlanInfo.name}</h2>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-green-500/20 text-green-500 rounded-full">
-                      ACTIVE
-                    </span>
+                    {isPaidPlan ? (
+                      isActive ? (
+                        <Badge className="bg-green-500">Active</Badge>
+                      ) : (
+                        <Badge variant="destructive">Inactive</Badge>
+                      )
+                    ) : (
+                      <Badge variant="secondary">Free Tier</Badge>
+                    )}
                   </div>
                   <p className="text-muted-foreground">Your current plan</p>
                 </div>
@@ -94,6 +107,31 @@ export const PlanContent = ({ profile, generationCount, lastGeneration }: PlanCo
                 <p className="font-semibold">{currentPlanInfo.palettes}</p>
               </div>
             </div>
+
+            {/* Renewal Date for paid plans */}
+            {isPaidPlan && expiresAt && isActive && (
+              <div className="mt-4 pt-4 border-t border-border flex items-center gap-2 text-sm">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Renews on</span>
+                <span className="font-medium">
+                  {new Date(expiresAt).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </span>
+              </div>
+            )}
+
+            {/* Upgrade prompt for free users */}
+            {!isPaidPlan && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <Button onClick={() => navigate("/pricing")} size="sm" className="gap-2">
+                  <ArrowUpRight className="w-4 h-4" />
+                  Upgrade Now
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -124,13 +162,16 @@ export const PlanContent = ({ profile, generationCount, lastGeneration }: PlanCo
         {/* All Plans */}
         <h3 className="text-lg font-semibold mb-4">All Plans</h3>
         <div className="space-y-3">
-          {plans.map((plan) => {
-            const isActive = plan.key === userPlan;
+          {plans.map((plan, index) => {
+            const isCurrent = plan.key === userPlan;
+            const isUpgrade = index > userPlanIndex;
+            const isDowngrade = index < userPlanIndex;
+            
             return (
               <div
                 key={plan.key}
                 className={`flex items-center justify-between p-4 rounded-xl border transition-colors ${
-                  isActive
+                  isCurrent
                     ? "border-primary bg-primary/5"
                     : "border-border bg-card hover:border-muted-foreground/30"
                 }`}
@@ -144,7 +185,7 @@ export const PlanContent = ({ profile, generationCount, lastGeneration }: PlanCo
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{plan.name}</span>
-                      {isActive && (
+                      {isCurrent && (
                         <Check className="w-4 h-4 text-green-500" />
                       )}
                     </div>
@@ -153,14 +194,19 @@ export const PlanContent = ({ profile, generationCount, lastGeneration }: PlanCo
                     </p>
                   </div>
                 </div>
-                {!isActive && plan.key !== "free" && (
+                {!isCurrent && plan.key !== "free" && (
                   <Button
-                    variant="outline"
+                    variant={isUpgrade ? "default" : "outline"}
                     size="sm"
                     onClick={() => navigate("/pricing")}
                   >
-                    Upgrade
+                    {isUpgrade ? "Upgrade" : isDowngrade ? "Downgrade" : "Select"}
                   </Button>
+                )}
+                {!isCurrent && plan.key === "free" && isPaidPlan && (
+                  <span className="text-xs text-muted-foreground">
+                    Cancel subscription to switch
+                  </span>
                 )}
               </div>
             );
