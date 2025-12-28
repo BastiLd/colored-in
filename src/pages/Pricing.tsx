@@ -186,7 +186,7 @@ function PlanCard({ plan, isActive }: { plan: Plan; isActive: boolean }) {
 
 export default function Pricing() {
   const navigate = useNavigate();
-  const [userPlan, setUserPlan] = useState<string | null>(null);
+  const [userPlan, setUserPlan] = useState<string>("free");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
@@ -200,9 +200,13 @@ export default function Pricing() {
           .eq("user_id", session.user.id)
           .single();
         
-        if (subscriptionData) {
+        if (subscriptionData?.plan) {
           setUserPlan(subscriptionData.plan);
+        } else {
+          setUserPlan("free");
         }
+      } else {
+        setUserPlan("free");
       }
     };
     checkUser();
