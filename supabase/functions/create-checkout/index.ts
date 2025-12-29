@@ -84,13 +84,14 @@ Deno.serve((req) => {
         const customer = await custRes.json();
         customerId = customer.id;
 
-        await fetch(`${supabaseUrl}/rest/v1/user_subscriptions`, {
+        // Upsert so we don't fail if a row already exists
+        await fetch(`${supabaseUrl}/rest/v1/user_subscriptions?on_conflict=user_id`, {
           method: 'POST',
           headers: {
             apikey: supabaseKey,
             Authorization: `Bearer ${supabaseKey}`,
             'Content-Type': 'application/json',
-            Prefer: 'return=representation',
+            Prefer: 'resolution=merge-duplicates,return=representation',
           },
           body: JSON.stringify({
             user_id: user.id,

@@ -87,13 +87,14 @@ async function supabaseRequest(
   serviceKey: string,
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  prefer?: string
 ): Promise<Response> {
   const headers: Record<string, string> = {
     'apikey': serviceKey,
     'Authorization': `Bearer ${serviceKey}`,
     'Content-Type': 'application/json',
-    'Prefer': 'return=representation',
+    'Prefer': prefer ?? 'return=representation',
   };
 
   return fetch(`${supabaseUrl}/rest/v1${path}`, {
@@ -227,12 +228,13 @@ async function handleCheckoutCompleted(
   // Calculate expiration date (end of current billing period)
   const expiresAt = new Date(subscription.current_period_end * 1000).toISOString();
 
-  // Update user subscription in database
+  // Upsert user subscription in database (prevents duplicate user_id on renewals)
+  // Supabase REST upsert: POST + on_conflict + Prefer: resolution=merge-duplicates
   const response = await supabaseRequest(
     supabaseUrl,
     serviceKey,
     'POST',
-    '/user_subscriptions',
+    '/user_subscriptions?on_conflict=user_id',
     {
       user_id: userId,
       plan: planKey,
@@ -243,7 +245,8 @@ async function handleCheckoutCompleted(
       expires_at: expiresAt,
       started_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    }
+    },
+    'resolution=merge-duplicates,return=representation'
   );
 
   if (!response.ok) {
