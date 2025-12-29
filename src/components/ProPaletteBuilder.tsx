@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight,
   ArrowRight,
-  ArrowLeft,
   Copy,
   Lock,
   Unlock,
@@ -11,16 +10,19 @@ import {
   MessageCircle,
   PanelLeftOpen,
   PanelRightOpen,
-  Sparkles,
   Wand2,
   MoveLeft,
   MoveRight,
   Palette as PaletteIcon,
   Search,
   ListFilter,
+  Send,
+  Droplets,
+  Layers,
+  Image,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getRandomPalette, generateRandomColors } from "@/data/palettes";
+import { getRandomPalette, generateRandomColors, getFreePalettes, type Palette } from "@/data/palettes";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -52,8 +54,17 @@ interface ProPaletteBuilderProps {
 }
 
 type ChatMode = "ask" | "edit";
+type SidebarTab = "palettes" | "colors" | "templates" | "assets";
+type EditScope = "selected" | "all";
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
 const DEFAULT_COLORS = getRandomPalette();
+
+const TOAST_POSITION = "top-center" as const;
 
 const clamp = (value: number, min = 0, max = 100) =>
   Math.min(max, Math.max(min, value));
@@ -105,6 +116,18 @@ function hslToHex({ h, s, l }: { h: number; s: number; l: number }) {
   return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`.toUpperCase();
 }
 
+// Color theory tips for Ask mode
+const COLOR_TIPS = [
+  "Complementary colors are opposite on the color wheel and create high contrast.",
+  "Analogous colors are next to each other on the color wheel and create harmony.",
+  "Split-complementary uses one base color and two colors adjacent to its complement.",
+  "Triadic colors are evenly spaced on the color wheel (120° apart).",
+  "Use 60-30-10 rule: 60% dominant color, 30% secondary, 10% accent.",
+  "Warm colors (red, orange, yellow) feel energetic. Cool colors (blue, green, purple) feel calm.",
+  "High saturation = vibrant and bold. Low saturation = muted and sophisticated.",
+  "Increase contrast for readability. Light text on dark background or vice versa.",
+];
+
 export function ProPaletteBuilder({
   onBrowse,
   onHome,
@@ -118,6 +141,25 @@ export function ProPaletteBuilder({
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [chatMode, setChatMode] = useState<ChatMode>("edit");
   const [isDesktop, setIsDesktop] = useState<boolean>(true);
+  
+  // New states for fixes
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("palettes");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [editScope, setEditScope] = useState<EditScope>("selected");
+  const [chatInput, setChatInput] = useState<string>("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+
+  // Get palettes for sidebar
+  const allPalettes = useMemo(() => getFreePalettes().slice(0, 100), []);
+  
+  const filteredPalettes = useMemo(() => {
+    if (!searchQuery.trim()) return allPalettes;
+    const query = searchQuery.toLowerCase();
+    return allPalettes.filter(p => 
+      p.name.toLowerCase().includes(query) ||
+      p.tags.some(t => t.toLowerCase().includes(query))
+    );
+  }, [allPalettes, searchQuery]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -144,8 +186,9 @@ export function ProPaletteBuilder({
         return { ...slot, color: next };
       });
     });
-    toast.success("Generated new palette (locked colors kept)", {
+    toast.success("New palette generated", {
       duration: 1500,
+      position: TOAST_POSITION,
     });
   }, []);
 
@@ -177,25 +220,25 @@ export function ProPaletteBuilder({
   const copyColor = useCallback(() => {
     if (!selectedSlot) return;
     navigator.clipboard.writeText(selectedSlot.color);
-    toast.success(`Copied ${selectedSlot.color}`);
+    toast.success(`Copied ${selectedSlot.color}`, { position: TOAST_POSITION });
   }, [selectedSlot]);
 
   const copyPalette = useCallback(() => {
     const json = JSON.stringify(colorSlots.map((c) => c.color));
     navigator.clipboard.writeText(json);
-    toast.success("Copied palette JSON");
+    toast.success("Copied palette JSON", { position: TOAST_POSITION });
   }, [colorSlots]);
 
   const copyPaletteCsv = useCallback(() => {
     navigator.clipboard.writeText(colorSlots.map((c) => c.color).join(","));
-    toast.success("Copied palette CSV");
+    toast.success("Copied palette CSV", { position: TOAST_POSITION });
   }, [colorSlots]);
 
   const savePalette = useCallback(async () => {
     const { data: { session } = { session: null } } =
       await supabase.auth.getSession();
     if (!session) {
-      toast.info("Sign in to save palettes.");
+      toast.info("Sign in to save palettes.", { position: TOAST_POSITION });
       return;
     }
     const name = `Manual palette ${new Date().toLocaleDateString()}`;
@@ -206,10 +249,10 @@ export function ProPaletteBuilder({
       created_by: session.user.id,
     });
     if (error) {
-      toast.error("Failed to save palette");
+      toast.error("Failed to save palette", { position: TOAST_POSITION });
       return;
     }
-    toast.success("Palette saved");
+    toast.success("Palette saved", { position: TOAST_POSITION });
   }, [colorSlots]);
 
   const setColorAt = useCallback((index: number, color: string) => {
@@ -239,31 +282,123 @@ export function ProPaletteBuilder({
     return hslToHex(hsl);
   };
 
+  // Real harmonize function - creates analogous color scheme based on selected color
+  const harmonizePalette = useCallback(() => {
+    if (selected === null || !selectedSlot) {
+      toast.info("Select a base color first", { position: TOAST_POSITION });
+      return;
+    }
+    
+    const baseHsl = hexToHsl(selectedSlot.color);
+    const numColors = colorSlots.length;
+    
+    // Create analogous harmony: spread colors around the base hue
+    const hueStep = 30; // 30 degrees between each color for analogous
+    const startOffset = -((numColors - 1) / 2) * hueStep;
+    
+    setColorSlots((prev) =>
+      prev.map((slot, idx) => {
+        if (slot.locked) return slot;
+        if (idx === selected) return slot; // Keep selected color as-is
+        
+        // Calculate new hue based on position relative to selected
+        const offset = (idx - selected) * hueStep;
+        const newHue = (baseHsl.h + offset + 360) % 360;
+        
+        // Keep similar saturation and lightness, with slight variation
+        const satVariation = (Math.random() - 0.5) * 10;
+        const lightVariation = (Math.random() - 0.5) * 10;
+        
+        return {
+          ...slot,
+          color: hslToHex({
+            h: newHue,
+            s: clamp(baseHsl.s + satVariation, 20, 90),
+            l: clamp(baseHsl.l + lightVariation, 25, 85),
+          }),
+        };
+      })
+    );
+    
+    toast.success("Palette harmonized", { duration: 1500, position: TOAST_POSITION });
+  }, [selected, selectedSlot, colorSlots.length]);
+
   const applyAdjustment = useCallback(
-    (intent: "warmer" | "cooler" | "pastel" | "contrast", scope: "selected" | "all") => {
-      if (!selectedSlot && scope === "selected") {
-        toast.info("Select a color first.");
+    (intent: "warmer" | "cooler" | "pastel" | "contrast") => {
+      const scope = editScope;
+      if (scope === "selected" && !selectedSlot) {
+        toast.info("Select a color first.", { position: TOAST_POSITION });
         return;
       }
-      setColorSlots((prev) =>
-        prev.map((slot, idx) => {
-          const affects = scope === "all" ? true : idx === selected;
-          if (!affects) return slot;
-          return { ...slot, color: adjustColor(slot.color, intent) };
-        })
-      );
+      
+      if (scope === "all" && selected !== null && selectedSlot) {
+        // When "Whole palette" is selected, harmonize based on selected color
+        const baseHsl = hexToHsl(selectedSlot.color);
+        
+        setColorSlots((prev) =>
+          prev.map((slot, idx) => {
+            if (slot.locked) return slot;
+            
+            // Apply the adjustment to each color
+            const adjustedColor = adjustColor(slot.color, intent);
+            const adjustedHsl = hexToHsl(adjustedColor);
+            
+            // Also shift the hue towards the base color for harmony
+            const hueDiff = baseHsl.h - adjustedHsl.h;
+            const hueShift = hueDiff * 0.3; // 30% shift towards base
+            
+            return {
+              ...slot,
+              color: hslToHex({
+                h: (adjustedHsl.h + hueShift + 360) % 360,
+                s: adjustedHsl.s,
+                l: adjustedHsl.l,
+              }),
+            };
+          })
+        );
+      } else {
+        // Apply to selected color only
+        setColorSlots((prev) =>
+          prev.map((slot, idx) => {
+            if (idx !== selected) return slot;
+            return { ...slot, color: adjustColor(slot.color, intent) };
+          })
+        );
+      }
+      
       toast.success(
         `${scope === "all" ? "Palette" : "Color"} updated (${intent})`,
-        { duration: 1200 }
+        { duration: 1200, position: TOAST_POSITION }
       );
     },
-    [selected, selectedSlot]
+    [selected, selectedSlot, editScope]
   );
 
   const handlePaletteClick = (index: number) => {
     setSelected(index);
   };
 
+  const applyPalette = useCallback((palette: Palette) => {
+    setColorSlots(palette.colors.map(c => ({ color: c, locked: false })));
+    toast.success(`Applied "${palette.name}"`, { duration: 1500, position: TOAST_POSITION });
+  }, []);
+
+  const handleAskSubmit = useCallback(() => {
+    if (!chatInput.trim()) return;
+    
+    const userMessage: ChatMessage = { role: "user", content: chatInput };
+    const randomTip = COLOR_TIPS[Math.floor(Math.random() * COLOR_TIPS.length)];
+    const assistantMessage: ChatMessage = { 
+      role: "assistant", 
+      content: `Great question! Here's a tip: ${randomTip}` 
+    };
+    
+    setChatMessages(prev => [...prev, userMessage, assistantMessage]);
+    setChatInput("");
+  }, [chatInput]);
+
+  // FIX: Only copy color when C is pressed WITHOUT Ctrl/Cmd
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -273,11 +408,12 @@ export function ProPaletteBuilder({
         e.preventDefault();
         regenerate();
       }
-      if (e.key.toLowerCase() === "l") {
+      if (e.key.toLowerCase() === "l" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         toggleLock();
       }
-      if (e.key.toLowerCase() === "c") {
+      // FIX: Only trigger copy color if Ctrl/Cmd is NOT pressed
+      if (e.key.toLowerCase() === "c" && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         copyColor();
       }
@@ -301,32 +437,127 @@ export function ProPaletteBuilder({
           <ListFilter className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-semibold">Resources</span>
         </div>
-        <Input placeholder="Search…" className="bg-muted border-border" />
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search palettes…" 
+            className="bg-muted border-border pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          {["Palettes", "Colors", "Templates", "Assets"].map((label) => (
-            <div
-              key={label}
-              className="rounded-lg bg-muted/50 border border-border px-3 py-2 text-muted-foreground"
-            >
-              {label}
-            </div>
-          ))}
+          <button
+            onClick={() => setSidebarTab("palettes")}
+            className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
+              sidebarTab === "palettes" 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <PaletteIcon className="w-4 h-4" />
+            Palettes
+          </button>
+          <button
+            onClick={() => setSidebarTab("colors")}
+            className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
+              sidebarTab === "colors" 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <Droplets className="w-4 h-4" />
+            Colors
+          </button>
+          <button
+            onClick={() => setSidebarTab("templates")}
+            className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
+              sidebarTab === "templates" 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            Templates
+          </button>
+          <button
+            onClick={() => setSidebarTab("assets")}
+            className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
+              sidebarTab === "assets" 
+                ? "bg-primary text-primary-foreground" 
+                : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            <Image className="w-4 h-4" />
+            Assets
+          </button>
         </div>
       </div>
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-3 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground">Coming soon</p>
-          <div className="space-y-2">
-            <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
-              Template presets
+        <div className="p-4 space-y-3">
+          {sidebarTab === "palettes" && (
+            <>
+              {filteredPalettes.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No palettes found.</p>
+              ) : (
+                filteredPalettes.map((palette) => (
+                  <button
+                    key={palette.id}
+                    onClick={() => applyPalette(palette)}
+                    className="w-full text-left rounded-lg bg-muted/50 border border-border p-3 hover:bg-muted transition-colors"
+                  >
+                    <div className="flex h-6 rounded overflow-hidden mb-2">
+                      {palette.colors.map((color, i) => (
+                        <div key={i} className="flex-1" style={{ backgroundColor: color }} />
+                      ))}
+                    </div>
+                    <p className="text-sm font-medium truncate">{palette.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {palette.tags.slice(0, 3).join(", ")}
+                    </p>
+                  </button>
+                ))
+              )}
+            </>
+          )}
+          {sidebarTab === "colors" && (
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Color Picker</p>
+              <Input 
+                type="color" 
+                value={selectedSlot?.color || "#000000"}
+                onChange={(e) => {
+                  if (selected !== null) {
+                    setColorAt(selected, e.target.value.toUpperCase());
+                  }
+                }}
+                className="w-full h-24 p-1 cursor-pointer"
+              />
+              <p className="text-xs">Select a color slot, then pick a color above.</p>
             </div>
-            <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
-              Asset library
+          )}
+          {sidebarTab === "templates" && (
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Coming soon</p>
+              <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
+                Template presets
+              </div>
+              <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
+                Brand kits
+              </div>
             </div>
-            <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
-              Brand kits
+          )}
+          {sidebarTab === "assets" && (
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Coming soon</p>
+              <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
+                Asset library
+              </div>
+              <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
+                Upload images
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </ScrollArea>
     </div>
@@ -359,61 +590,96 @@ export function ProPaletteBuilder({
           <TabsTrigger value="ask">Ask mode</TabsTrigger>
           <TabsTrigger value="edit">Edit mode</TabsTrigger>
         </TabsList>
-        <TabsContent value="ask" className="px-4 pb-4">
-          <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground space-y-2">
-            <p>Chat replies coming soon.</p>
-            <p>Try: “Suggest a name for this palette.”</p>
+        <TabsContent value="ask" className="px-4 pb-4 flex-1 flex flex-col">
+          <ScrollArea className="flex-1 mb-4 max-h-[300px]">
+            <div className="space-y-3">
+              {chatMessages.length === 0 ? (
+                <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground space-y-2">
+                  <p>Ask me anything about color theory!</p>
+                  <p className="text-xs">Try: "What are complementary colors?"</p>
+                </div>
+              ) : (
+                chatMessages.map((msg, i) => (
+                  <div 
+                    key={i} 
+                    className={`rounded-xl p-3 text-sm ${
+                      msg.role === "user" 
+                        ? "bg-primary text-primary-foreground ml-8" 
+                        : "bg-muted text-foreground mr-8"
+                    }`}
+                  >
+                    {msg.content}
+                  </div>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+          <div className="flex gap-2">
+            <Input 
+              placeholder="Ask a question..."
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleAskSubmit();
+                }
+              }}
+            />
+            <Button size="icon" onClick={handleAskSubmit}>
+              <Send className="w-4 h-4" />
+            </Button>
           </div>
         </TabsContent>
         <TabsContent value="edit" className="px-4 pb-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Quick edits apply to the {selected !== null ? "selected color" : "palette"}.
+            Quick edits apply to the {editScope === "selected" ? "selected color" : "whole palette"}.
           </p>
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant="outline"
               className="justify-start"
-              onClick={() => applyAdjustment("warmer", selected !== null ? "selected" : "all")}
+              onClick={() => applyAdjustment("warmer")}
             >
               Warmer
             </Button>
             <Button
               variant="outline"
               className="justify-start"
-              onClick={() => applyAdjustment("cooler", selected !== null ? "selected" : "all")}
+              onClick={() => applyAdjustment("cooler")}
             >
               Cooler
             </Button>
             <Button
               variant="outline"
               className="justify-start"
-              onClick={() => applyAdjustment("pastel", selected !== null ? "selected" : "all")}
+              onClick={() => applyAdjustment("pastel")}
             >
               Pastel
             </Button>
             <Button
               variant="outline"
               className="justify-start"
-              onClick={() => applyAdjustment("contrast", selected !== null ? "selected" : "all")}
+              onClick={() => applyAdjustment("contrast")}
             >
               More contrast
             </Button>
           </div>
           <Separator />
           <div className="space-y-2 text-xs text-muted-foreground">
-            <p>Scope</p>
+            <p className="font-medium text-foreground">Scope</p>
             <div className="flex gap-2">
               <Button
-                variant={selected !== null ? "secondary" : "outline"}
+                variant={editScope === "selected" ? "secondary" : "outline"}
                 size="sm"
-                onClick={() => applyAdjustment("warmer", "selected")}
+                onClick={() => setEditScope("selected")}
               >
                 Selected color
               </Button>
               <Button
-                variant="outline"
+                variant={editScope === "all" ? "secondary" : "outline"}
                 size="sm"
-                onClick={() => applyAdjustment("warmer", "all")}
+                onClick={() => setEditScope("all")}
               >
                 Whole palette
               </Button>
@@ -539,7 +805,7 @@ export function ProPaletteBuilder({
                             onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(slot.color);
-                              toast.success(`Copied ${slot.color}`);
+                              toast.success(`Copied ${slot.color}`, { position: TOAST_POSITION });
                             }}
                           >
                             <Copy className="w-4 h-4 mr-1" />
@@ -552,6 +818,7 @@ export function ProPaletteBuilder({
                             onClick={(e) => {
                               e.stopPropagation();
                               setColorAt(idx, adjustColor(slot.color, "pastel"));
+                              toast.success("Color tweaked", { position: TOAST_POSITION });
                             }}
                           >
                             <Wand2 className="w-4 h-4 mr-1" />
@@ -638,7 +905,7 @@ export function ProPaletteBuilder({
                   </Button>
                   <Button
                     variant="secondary"
-                    onClick={() => applyAdjustment("pastel", "all")}
+                    onClick={harmonizePalette}
                   >
                     <ArrowLeftRight className="w-4 h-4 mr-2" />
                     Harmonize
