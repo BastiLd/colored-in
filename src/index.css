@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
+/* Tailwind directives are processed by PostCSS. If your editor reports
+   unknown at-rules (@tailwind, @apply), enable Tailwind CSS IntelliSense
+   or disable built-in CSS validation for this file. */
+/* stylelint-disable at-rule-no-unknown */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -114,3 +118,4 @@
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
   }
 }
+/* stylelint-enable at-rule-no-unknown */

@@ -48,6 +48,7 @@ const Settings = () => {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
   const [isCanceling, setIsCanceling] = useState(false);
   const [isLoadingPortal, setIsLoadingPortal] = useState(false);
+  const [isDevUpdatingPlan, setIsDevUpdatingPlan] = useState(false);
 
   useEffect(() => {
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
@@ -67,16 +68,7 @@ const Settings = () => {
         return;
       }
 
-      // Fetch subscription data
-      const { data: subData } = await supabase
-        .from("user_subscriptions")
-        .select("plan, is_active, expires_at, stripe_subscription_id, stripe_customer_id")
-        .eq("user_id", session.user.id)
-        .single();
-
-      if (subData) {
-        setSubscription(subData);
-      }
+      await refreshSubscription(session.user.id);
 
       setLoading(false);
     };
@@ -85,6 +77,60 @@ const Settings = () => {
 
     return () => authSubscription.unsubscribe();
   }, [navigate]);
+
+  const refreshSubscription = async (userId: string) => {
+    const { data: subData } = await supabase
+      .from("user_subscriptions")
+      .select("plan, is_active, expires_at, stripe_subscription_id, stripe_customer_id")
+      .eq("user_id", userId)
+      .single();
+
+    if (subData) {
+      setSubscription(subData);
+    }
+  };
+
+  const setDevPlan = async (plan: "free" | "ultra") => {
+    if (!import.meta.env.DEV) return;
+    if (!user?.id) {
+      toast.error("No user session found.");
+      return;
+    }
+
+    setIsDevUpdatingPlan(true);
+    try {
+      const payload =
+        plan === "free"
+          ? {
+              user_id: user.id,
+              plan: "free",
+              is_active: true,
+              expires_at: null,
+              updated_at: new Date().toISOString(),
+            }
+          : {
+              user_id: user.id,
+              plan: "ultra",
+              is_active: true,
+              expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+
+      const { error } = await supabase
+        .from("user_subscriptions")
+        .upsert(payload, { onConflict: "user_id" });
+
+      if (error) throw error;
+
+      await refreshSubscription(user.id);
+      toast.success(`DEV: set plan to ${plan.toUpperCase()}`);
+    } catch (e: any) {
+      console.error("DEV set plan error:", e);
+      toast.error(e?.message || "Failed to update plan");
+    } finally {
+      setIsDevUpdatingPlan(false);
+    }
+  };
 
   const handleManageBilling = async () => {
     if (!subscription?.stripe_customer_id) {
@@ -422,6 +468,32 @@ const Settings = () => {
             )}
           </div>
         </div>
+
+        {/* DEV Tools (local only) */}
+        {import.meta.env.DEV && (
+          <div className="mt-6 bg-card border border-dashed border-border rounded-xl p-6">
+            <h3 className="font-medium mb-2">DEV Tools</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Local-only helpers for testing while Stripe is not enabled. This affects the
+              currently logged-in user only.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setDevPlan("ultra")}
+                disabled={isDevUpdatingPlan}
+              >
+                {isDevUpdatingPlan ? "Updating..." : "Grant ULTRA (30 days)"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setDevPlan("free")}
+                disabled={isDevUpdatingPlan}
+              >
+                Reset to FREE
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Danger Zone */}
         <div className="mt-6 bg-card border-2 border-red-500/20 rounded-xl p-6">

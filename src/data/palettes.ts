@@ -332,10 +332,10 @@ const FREE_PALETTE_COUNT = 2000;
 // Generate a single palette by index (on-demand generation)
 function generatePaletteByIndex(index: number): Palette {
   const seed = index * 12345 + 67890;
-  const colors = generateCoolorsStylePalette(seed);
-  const name = generatePaletteName(seed + 11111);
-  const tags = generateTags(colors, seed + 22222);
-  
+    const colors = generateCoolorsStylePalette(seed);
+    const name = generatePaletteName(seed + 11111);
+    const tags = generateTags(colors, seed + 22222);
+    
   return {
     id: String(index + 1),
     name,

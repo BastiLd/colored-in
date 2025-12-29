@@ -1,23 +1,44 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { 
-  Copy, 
-  Lock, 
-  Unlock, 
-  RefreshCw, 
-  ChevronRight, 
-  Save, 
-  X, 
-  Plus,
-  Palette as PaletteIcon,
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeftRight,
+  ArrowRight,
+  ArrowLeft,
+  Copy,
+  Lock,
+  Unlock,
+  RefreshCw,
+  Save,
+  MessageCircle,
+  PanelLeftOpen,
+  PanelRightOpen,
   Sparkles,
-  Droplets,
+  Wand2,
+  MoveLeft,
+  MoveRight,
+  Palette as PaletteIcon,
   Search,
-  ChevronLeft
+  ListFilter,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getRandomPalette, generateRandomColors, getFreePalettes, Palette } from "@/data/palettes";
+import { getRandomPalette, generateRandomColors } from "@/data/palettes";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 interface ColorSlot {
   color: string;
@@ -30,171 +51,242 @@ interface ProPaletteBuilderProps {
   onOldDesign: () => void;
 }
 
-type SidebarTab = "palettes" | "ai" | "colors" | null;
+type ChatMode = "ask" | "edit";
 
-export function ProPaletteBuilder({ onBrowse, onHome, onOldDesign }: ProPaletteBuilderProps) {
-  const [colorSlots, setColorSlots] = useState<ColorSlot[]>(() => 
-    getRandomPalette().map(color => ({ color, locked: false }))
+const DEFAULT_COLORS = getRandomPalette();
+
+const clamp = (value: number, min = 0, max = 100) =>
+  Math.min(max, Math.max(min, value));
+
+function hexToHsl(hex: string) {
+  const parsed = hex.replace("#", "");
+  const r = parseInt(parsed.substring(0, 2), 16) / 255;
+  const g = parseInt(parsed.substring(2, 4), 16) / 255;
+  const b = parseInt(parsed.substring(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  let s = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+        break;
+    }
+    h /= 6;
+  }
+  return {
+    h: h * 360,
+    s: s * 100,
+    l: l * 100,
+  };
+}
+
+function hslToHex({ h, s, l }: { h: number; s: number; l: number }) {
+  s /= 100;
+  l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) =>
+    l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  const toHex = (x: number) =>
+    Math.round(x * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`.toUpperCase();
+}
+
+export function ProPaletteBuilder({
+  onBrowse,
+  onHome,
+  onOldDesign,
+}: ProPaletteBuilderProps) {
+  const [colorSlots, setColorSlots] = useState<ColorSlot[]>(
+    DEFAULT_COLORS.map((c) => ({ color: c, locked: false }))
   );
-  const [activeTab, setActiveTab] = useState<SidebarTab>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSlotIndex, setSelectedSlotIndex] = useState<number | null>(null);
-  const [customColor, setCustomColor] = useState("#6366F1");
-  const [showAutoFillPopup, setShowAutoFillPopup] = useState(false);
-  const [autoFillPrompt, setAutoFillPrompt] = useState("");
-  const [hoveredSlot, setHoveredSlot] = useState<number | null>(null);
-
-  const allPalettes = useMemo(() => getFreePalettes(), []);
-  
-  const filteredPalettes = useMemo(() => {
-    if (!searchQuery.trim()) return allPalettes.slice(0, 100);
-    const query = searchQuery.toLowerCase();
-    return allPalettes
-      .filter(p => 
-        p.name.toLowerCase().includes(query) || 
-        p.tags.some(t => t.toLowerCase().includes(query))
-      )
-      .slice(0, 100);
-  }, [allPalettes, searchQuery]);
-
-  const generateNewPalette = useCallback(() => {
-    const newColors = Math.random() > 0.3 ? getRandomPalette() : generateRandomColors();
-    setColorSlots(prev => 
-      prev.map((slot, i) => 
-        slot.locked ? slot : { color: newColors[i] || generateRandomColors(1)[0], locked: false }
-      )
-    );
-  }, []);
-
-  const toggleLock = useCallback((index: number) => {
-    setColorSlots(prev => 
-      prev.map((slot, i) => 
-        i === index ? { ...slot, locked: !slot.locked } : slot
-      )
-    );
-  }, []);
-
-  const copyColor = useCallback((color: string) => {
-    navigator.clipboard.writeText(color);
-    toast.success(`Copied ${color}`, { duration: 1500, position: "bottom-center" });
-  }, []);
-
-  const copyAllColors = useCallback(() => {
-    const colors = colorSlots.map(s => s.color).join(", ");
-    navigator.clipboard.writeText(colors);
-    toast.success("Copied all colors!", { duration: 1500, position: "bottom-center" });
-  }, [colorSlots]);
-
-  const lockedColors = colorSlots.filter(s => s.locked).map(s => s.color);
-  const canSave = lockedColors.length >= 3;
-
-  const savePalette = useCallback(async () => {
-    if (!canSave) {
-      toast.error("Lock at least 3 colors to save", { duration: 2000 });
-      return;
-    }
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      toast.error("Please log in to save palettes", { duration: 2000 });
-      return;
-    }
-
-    const paletteName = `Custom ${new Date().toLocaleDateString()}`;
-    
-    const { error } = await supabase
-      .from("public_palettes")
-      .insert({
-        name: paletteName,
-        colors: lockedColors,
-        tags: ["custom", "user-created"],
-        created_by: session.user.id
-      });
-
-    if (error) {
-      toast.error("Failed to save palette", { duration: 2000 });
-      return;
-    }
-
-    toast.success(`Saved palette with ${lockedColors.length} colors!`, { duration: 2000, position: "bottom-center" });
-  }, [canSave, lockedColors]);
-
-  const removeSlot = useCallback((index: number) => {
-    if (colorSlots.length <= 2) {
-      toast.error("Minimum 2 colors required", { duration: 1500 });
-      return;
-    }
-    setColorSlots(prev => prev.filter((_, i) => i !== index));
-  }, [colorSlots.length]);
-
-  const addSlot = useCallback((position: "start" | "end") => {
-    if (colorSlots.length >= 10) {
-      toast.error("Maximum 10 colors allowed", { duration: 1500 });
-      return;
-    }
-    const newColor = generateRandomColors(1)[0];
-    setColorSlots(prev => 
-      position === "start" 
-        ? [{ color: newColor, locked: false }, ...prev]
-        : [...prev, { color: newColor, locked: false }]
-    );
-  }, [colorSlots.length]);
-
-  const applyPalette = useCallback((palette: Palette) => {
-    setColorSlots(palette.colors.map(color => ({ color, locked: false })));
-    setActiveTab(null);
-    toast.success(`Applied "${palette.name}"`, { duration: 1500 });
-  }, []);
-
-  const handleColorSlotClick = useCallback((index: number) => {
-    if (activeTab === "colors") {
-      setSelectedSlotIndex(index);
-    } else {
-      copyColor(colorSlots[index].color);
-    }
-  }, [activeTab, colorSlots, copyColor]);
-
-  const applyCustomColor = useCallback(() => {
-    if (selectedSlotIndex !== null) {
-      setColorSlots(prev => 
-        prev.map((slot, i) => 
-          i === selectedSlotIndex ? { ...slot, color: customColor } : slot
-        )
-      );
-      setShowAutoFillPopup(true);
-    }
-  }, [selectedSlotIndex, customColor]);
-
-  const handleAutoFill = useCallback(async () => {
-    toast.success("AI Auto-fill coming soon!", { duration: 2000 });
-    setShowAutoFillPopup(false);
-    setAutoFillPrompt("");
-  }, []);
-
-  const handleTabClick = useCallback((tab: SidebarTab) => {
-    setActiveTab(prev => prev === tab ? null : tab);
-    setSelectedSlotIndex(null);
-    setShowAutoFillPopup(false);
-  }, []);
-
-  const handleMainAreaClick = useCallback(() => {
-    if (activeTab === "palettes" || activeTab === "ai") {
-      setActiveTab(null);
-    }
-  }, [activeTab]);
+  const [selected, setSelected] = useState<number>(0);
+  const [isChatOpen, setIsChatOpen] = useState<boolean>(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [chatMode, setChatMode] = useState<ChatMode>("edit");
+  const [isDesktop, setIsDesktop] = useState<boolean>(true);
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === "Space" && e.target === document.body) {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    setIsDesktop(mq.matches);
+    setIsChatOpen(mq.matches);
+    const handler = (e: MediaQueryListEvent) => {
+      setIsDesktop(e.matches);
+      setIsChatOpen(e.matches);
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  const selectedSlot = colorSlots[selected] ?? colorSlots[0];
+
+  const regenerate = useCallback(() => {
+    setColorSlots((prev) => {
+      const fresh = getRandomPalette();
+      const fallback = generateRandomColors(prev.length);
+      return prev.map((slot, idx) => {
+        if (slot.locked) return slot;
+        const next =
+          fresh[idx] ?? fallback[idx] ?? generateRandomColors(1)[0] ?? slot.color;
+        return { ...slot, color: next };
+      });
+    });
+    toast.success("Generated new palette (locked colors kept)", {
+      duration: 1500,
+    });
+  }, []);
+
+  const moveSlot = useCallback(
+    (direction: -1 | 1) => {
+      setColorSlots((prev) => {
+        if (selected === null || selected < 0 || selected >= prev.length)
+          return prev;
+        const target = selected + direction;
+        if (target < 0 || target >= prev.length) return prev;
+        const next = [...prev];
+        [next[selected], next[target]] = [next[target], next[selected]];
+        setSelected(target);
+        return next;
+      });
+    },
+    [selected]
+  );
+
+  const toggleLock = useCallback(() => {
+    if (selected === null) return;
+    setColorSlots((prev) =>
+      prev.map((slot, idx) =>
+        idx === selected ? { ...slot, locked: !slot.locked } : slot
+      )
+    );
+  }, [selected]);
+
+  const copyColor = useCallback(() => {
+    if (!selectedSlot) return;
+    navigator.clipboard.writeText(selectedSlot.color);
+    toast.success(`Copied ${selectedSlot.color}`);
+  }, [selectedSlot]);
+
+  const copyPalette = useCallback(() => {
+    const json = JSON.stringify(colorSlots.map((c) => c.color));
+    navigator.clipboard.writeText(json);
+    toast.success("Copied palette JSON");
+  }, [colorSlots]);
+
+  const copyPaletteCsv = useCallback(() => {
+    navigator.clipboard.writeText(colorSlots.map((c) => c.color).join(","));
+    toast.success("Copied palette CSV");
+  }, [colorSlots]);
+
+  const savePalette = useCallback(async () => {
+    const { data: { session } = { session: null } } =
+      await supabase.auth.getSession();
+    if (!session) {
+      toast.info("Sign in to save palettes.");
+      return;
+    }
+    const name = `Manual palette ${new Date().toLocaleDateString()}`;
+    const { error } = await supabase.from("public_palettes").insert({
+      name,
+      colors: colorSlots.map((c) => c.color),
+      tags: ["manual", "pro-builder"],
+      created_by: session.user.id,
+    });
+    if (error) {
+      toast.error("Failed to save palette");
+      return;
+    }
+    toast.success("Palette saved");
+  }, [colorSlots]);
+
+  const setColorAt = useCallback((index: number, color: string) => {
+    setColorSlots((prev) =>
+      prev.map((slot, idx) => (idx === index ? { ...slot, color } : slot))
+    );
+  }, []);
+
+  const adjustColor = (hex: string, intent: "warmer" | "cooler" | "pastel" | "contrast") => {
+    const hsl = hexToHsl(hex);
+    switch (intent) {
+      case "warmer":
+        hsl.h = (hsl.h + 12) % 360;
+        break;
+      case "cooler":
+        hsl.h = (hsl.h - 12 + 360) % 360;
+        break;
+      case "pastel":
+        hsl.s = clamp(hsl.s - 15);
+        hsl.l = clamp(hsl.l + 8);
+        break;
+      case "contrast":
+        hsl.s = clamp(hsl.s + 12);
+        hsl.l = clamp(hsl.l + (hsl.l < 50 ? -5 : 5));
+        break;
+    }
+    return hslToHex(hsl);
+  };
+
+  const applyAdjustment = useCallback(
+    (intent: "warmer" | "cooler" | "pastel" | "contrast", scope: "selected" | "all") => {
+      if (!selectedSlot && scope === "selected") {
+        toast.info("Select a color first.");
+        return;
+      }
+      setColorSlots((prev) =>
+        prev.map((slot, idx) => {
+          const affects = scope === "all" ? true : idx === selected;
+          if (!affects) return slot;
+          return { ...slot, color: adjustColor(slot.color, intent) };
+        })
+      );
+      toast.success(
+        `${scope === "all" ? "Palette" : "Color"} updated (${intent})`,
+        { duration: 1200 }
+      );
+    },
+    [selected, selectedSlot]
+  );
+
+  const handlePaletteClick = (index: number) => {
+    setSelected(index);
+  };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      if (e.code === "Space") {
         e.preventDefault();
-        generateNewPalette();
+        regenerate();
+      }
+      if (e.key.toLowerCase() === "l") {
+        e.preventDefault();
+        toggleLock();
+      }
+      if (e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        copyColor();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [generateNewPalette]);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [regenerate, toggleLock, copyColor]);
 
-  const getContrastColor = (hex: string): string => {
+  const contrastColor = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16);
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
@@ -202,337 +294,362 @@ export function ProPaletteBuilder({ onBrowse, onHome, onOldDesign }: ProPaletteB
     return luminance > 0.5 ? "#000000" : "#FFFFFF";
   };
 
+  const sidebarContent = (
+    <div className="h-full flex flex-col">
+      <div className="p-4 border-b border-border space-y-3">
+        <div className="flex items-center gap-2">
+          <ListFilter className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-semibold">Resources</span>
+        </div>
+        <Input placeholder="Search…" className="bg-muted border-border" />
+        <div className="grid grid-cols-2 gap-2 text-sm">
+          {["Palettes", "Colors", "Templates", "Assets"].map((label) => (
+            <div
+              key={label}
+              className="rounded-lg bg-muted/50 border border-border px-3 py-2 text-muted-foreground"
+            >
+              {label}
+            </div>
+          ))}
+        </div>
+      </div>
+      <ScrollArea className="flex-1">
+        <div className="p-4 space-y-3 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">Coming soon</p>
+          <div className="space-y-2">
+            <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
+              Template presets
+            </div>
+            <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
+              Asset library
+            </div>
+            <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
+              Brand kits
+            </div>
+          </div>
+        </div>
+      </ScrollArea>
+    </div>
+  );
+
+  const chatContent = (
+    <div className="h-full flex flex-col">
+      <div className="p-4 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-primary" />
+          <div>
+            <p className="text-sm font-semibold">Chat</p>
+            <p className="text-xs text-muted-foreground">
+              Ask or apply edits to your palette
+            </p>
+          </div>
+        </div>
+        {!isDesktop && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsChatOpen(false)}
+          >
+            <ArrowRight className="w-4 h-4" />
+          </Button>
+        )}
+      </div>
+      <Tabs value={chatMode} onValueChange={(v) => setChatMode(v as ChatMode)}>
+        <TabsList className="grid grid-cols-2 m-4">
+          <TabsTrigger value="ask">Ask mode</TabsTrigger>
+          <TabsTrigger value="edit">Edit mode</TabsTrigger>
+        </TabsList>
+        <TabsContent value="ask" className="px-4 pb-4">
+          <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground space-y-2">
+            <p>Chat replies coming soon.</p>
+            <p>Try: “Suggest a name for this palette.”</p>
+          </div>
+        </TabsContent>
+        <TabsContent value="edit" className="px-4 pb-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Quick edits apply to the {selected !== null ? "selected color" : "palette"}.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => applyAdjustment("warmer", selected !== null ? "selected" : "all")}
+            >
+              Warmer
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => applyAdjustment("cooler", selected !== null ? "selected" : "all")}
+            >
+              Cooler
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => applyAdjustment("pastel", selected !== null ? "selected" : "all")}
+            >
+              Pastel
+            </Button>
+            <Button
+              variant="outline"
+              className="justify-start"
+              onClick={() => applyAdjustment("contrast", selected !== null ? "selected" : "all")}
+            >
+              More contrast
+            </Button>
+          </div>
+          <Separator />
+          <div className="space-y-2 text-xs text-muted-foreground">
+            <p>Scope</p>
+            <div className="flex gap-2">
+              <Button
+                variant={selected !== null ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => applyAdjustment("warmer", "selected")}
+              >
+                Selected color
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => applyAdjustment("warmer", "all")}
+              >
+                Whole palette
+              </Button>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 bg-card border-b border-border z-20">
-        <button 
-          onClick={onHome}
-          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-        >
-          <h1 className="text-xl font-bold text-gradient font-display">Colored In</h1>
-        </button>
-        
+      <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-card/80 backdrop-blur">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onOldDesign}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors"
+          <Button
+            variant="ghost"
+            className="gap-2 px-2"
+            onClick={onHome}
           >
-            Old Design
-          </button>
-
-          <button
-            onClick={savePalette}
-            disabled={!canSave}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              canSave 
-                ? "text-primary-foreground bg-primary hover:opacity-90 glow-primary" 
-                : "text-muted-foreground bg-muted cursor-not-allowed"
-            }`}
-            title={canSave ? "Save locked colors as palette" : "Lock at least 3 colors to save"}
-          >
-            <Save className="w-4 h-4" />
-            Save ({lockedColors.length}/3+)
-          </button>
-
-          <button
-            onClick={copyAllColors}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary hover:bg-muted rounded-lg transition-colors"
-          >
-            <Copy className="w-4 h-4" />
-            Export
-          </button>
-          
-          <button
-            onClick={onBrowse}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all glow-primary"
-          >
-            Browse Palettes
-            <ChevronRight className="w-4 h-4" />
-          </button>
+            <PaletteIcon className="w-5 h-5 text-primary" />
+            <span className="font-display font-semibold">Colored In</span>
+          </Button>
+          <span className="text-sm text-muted-foreground hidden sm:block">
+            Pro Manual Builder
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onOldDesign}>
+            Old builder
+          </Button>
+          <Button variant="outline" size="sm" onClick={onBrowse}>
+            Browse palettes
+          </Button>
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden">
-        {/* Icon Sidebar */}
-        <div className="w-16 bg-card border-r border-border flex flex-col items-center py-4 gap-2 z-10">
-          <button
-            onClick={() => handleTabClick("palettes")}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-              activeTab === "palettes" 
-                ? "bg-primary text-primary-foreground" 
-                : "hover:bg-muted text-muted-foreground hover:text-foreground"
-            }`}
-            title="Palettes"
-          >
-            <PaletteIcon className="w-5 h-5" />
-          </button>
-          
-          <button
-            onClick={() => handleTabClick("ai")}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-              activeTab === "ai" 
-                ? "bg-primary text-primary-foreground" 
-                : "hover:bg-muted text-muted-foreground hover:text-foreground"
-            }`}
-            title="AI Generator"
-          >
-            <Sparkles className="w-5 h-5" />
-          </button>
-          
-          <button
-            onClick={() => handleTabClick("colors")}
-            className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-              activeTab === "colors" 
-                ? "bg-primary text-primary-foreground" 
-                : "hover:bg-muted text-muted-foreground hover:text-foreground"
-            }`}
-            title="Colors"
-          >
-            <Droplets className="w-5 h-5" />
-          </button>
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[260px_1fr_auto] overflow-hidden">
+        <div className="hidden lg:block border-r border-border bg-card">
+          {sidebarContent}
         </div>
 
-        {/* Expandable Panel */}
-        <div 
-          className={`bg-card border-r border-border transition-all duration-300 overflow-hidden z-10 ${
-            activeTab && activeTab !== "colors" ? "w-80" : "w-0"
-          }`}
-        >
-          {activeTab === "palettes" && (
-            <div className="w-80 h-full flex flex-col">
-              <div className="p-4 border-b border-border">
-                <h3 className="font-semibold mb-3">Palettes</h3>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-muted border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-              <ScrollArea className="flex-1">
-                <div className="p-4 space-y-3">
-                  {filteredPalettes.map((palette) => (
-                    <button
-                      key={palette.id}
-                      onClick={() => applyPalette(palette)}
-                      className="w-full p-3 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-left group"
-                    >
-                      <div className="flex h-8 rounded-lg overflow-hidden mb-2">
-                        {palette.colors.map((color, i) => (
-                          <div key={i} className="flex-1" style={{ backgroundColor: color }} />
-                        ))}
-                      </div>
-                      <p className="text-sm font-medium truncate">{palette.name}</p>
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {palette.tags.slice(0, 2).map((tag, i) => (
-                          <span key={i} className="text-xs px-2 py-0.5 bg-background rounded-full text-muted-foreground">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </div>
-          )}
-
-          {activeTab === "ai" && (
-            <div className="w-80 h-full flex flex-col p-4">
-              <h3 className="font-semibold mb-3">AI Generator</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Describe your desired color palette and the AI will create it for you.
-              </p>
-              <textarea
-                placeholder="e.g. 'Sunset over the ocean' or 'Modern tech startup'"
-                className="flex-1 p-3 bg-muted border border-border rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                rows={4}
-              />
-              <button className="mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
-                <Sparkles className="w-4 h-4" />
-                Generate
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Main Color Area */}
-        <div className="flex-1 flex relative" onClick={handleMainAreaClick}>
-          {/* Add Button - Start */}
-          <button
-            onClick={(e) => { e.stopPropagation(); addSlot("start"); }}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-8 h-16 bg-card/80 hover:bg-card border border-border rounded-r-lg flex items-center justify-center transition-all hover:w-10 group"
-          >
-            <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
-          </button>
-
-          {/* Color Slots */}
-          {colorSlots.map((slot, index) => (
-            <div
-              key={index}
-              className={`flex-1 relative group cursor-pointer transition-all duration-200 ${
-                hoveredSlot === index ? "flex-[1.15]" : ""
-              } ${selectedSlotIndex === index ? "ring-4 ring-primary ring-inset" : ""}`}
-              style={{ backgroundColor: slot.color }}
-              onClick={(e) => { e.stopPropagation(); handleColorSlotClick(index); }}
-              onMouseEnter={() => setHoveredSlot(index)}
-              onMouseLeave={() => setHoveredSlot(null)}
-            >
-              {/* Remove Button */}
-              {hoveredSlot === index && colorSlots.length > 2 && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); removeSlot(index); }}
-                  className="absolute top-4 right-4 p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors z-10"
-                  style={{ color: getContrastColor(slot.color) }}
-                >
-                  <X className="w-4 h-4" />
-                </button>
+        <div className="relative flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/70 backdrop-blur">
+            <div className="flex items-center gap-2">
+              {!isDesktop && (
+                <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <PanelLeftOpen className="w-4 h-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="p-0 w-80">
+                    <SheetHeader className="p-4 border-b border-border">
+                      <SheetTitle>Tools</SheetTitle>
+                    </SheetHeader>
+                    {sidebarContent}
+                  </SheetContent>
+                </Sheet>
               )}
-
-              {/* Color Info */}
-              <div 
-                className="absolute inset-x-0 bottom-0 flex flex-col items-center pb-8 transition-opacity"
-                style={{ color: getContrastColor(slot.color) }}
-              >
-                <span className="font-mono text-sm font-medium tracking-wider opacity-80 group-hover:opacity-100">
-                  {slot.color}
-                </span>
-              </div>
-
-              {/* Actions */}
-              <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex flex-col items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={(e) => { e.stopPropagation(); copyColor(slot.color); }}
-                  className="p-3 rounded-full bg-black/20 backdrop-blur-sm hover:bg-black/30 transition-colors"
-                  style={{ color: getContrastColor(slot.color) }}
-                >
-                  <Copy className="w-5 h-5" />
-                </button>
-                
-                <button
-                  onClick={(e) => { e.stopPropagation(); toggleLock(index); }}
-                  className="p-3 rounded-full bg-black/20 backdrop-blur-sm hover:bg-black/30 transition-colors"
-                  style={{ color: getContrastColor(slot.color) }}
-                >
-                  {slot.locked ? <Lock className="w-5 h-5" /> : <Unlock className="w-5 h-5" />}
-                </button>
-              </div>
-
-              {/* Lock indicator */}
-              {slot.locked && (
-                <div 
-                  className="absolute top-4 left-1/2 -translate-x-1/2"
-                  style={{ color: getContrastColor(slot.color) }}
-                >
-                  <Lock className="w-4 h-4" />
-                </div>
-              )}
-
-              {/* Color Selection Mode Indicator */}
-              {activeTab === "colors" && selectedSlotIndex !== index && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                  <span 
-                    className="text-sm font-medium px-3 py-1 rounded-full bg-black/20 backdrop-blur-sm"
-                    style={{ color: getContrastColor(slot.color) }}
-                  >
-                    Click to select
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Add Button - End */}
-          <button
-            onClick={(e) => { e.stopPropagation(); addSlot("end"); }}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-8 h-16 bg-card/80 hover:bg-card border border-border rounded-l-lg flex items-center justify-center transition-all hover:w-10 group"
-          >
-            <Plus className="w-4 h-4 text-muted-foreground group-hover:text-foreground" />
-          </button>
-
-          {/* Color Picker Panel */}
-          {activeTab === "colors" && (
-            <div className="absolute right-4 top-4 w-64 bg-card border border-border rounded-xl shadow-2xl p-4 z-20">
-              <h4 className="font-semibold mb-3">Custom Color</h4>
-              {selectedSlotIndex !== null ? (
-                <>
-                  <input
-                    type="color"
-                    value={customColor}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                    className="w-full h-32 rounded-lg cursor-pointer border-0"
-                  />
-                  <input
-                    type="text"
-                    value={customColor}
-                    onChange={(e) => setCustomColor(e.target.value)}
-                    className="w-full mt-2 px-3 py-2 bg-muted border border-border rounded-lg text-sm font-mono text-center"
-                  />
-                  <button
-                    onClick={applyCustomColor}
-                    className="w-full mt-3 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-                  >
-                    Apply
-                  </button>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Select a color block to change its color.
+              <div>
+                <p className="text-sm font-semibold">Palette</p>
+                <p className="text-xs text-muted-foreground">
+                  Click to select, hover to copy
                 </p>
-              )}
-            </div>
-          )}
-
-          {/* Auto-fill Popup */}
-          {showAutoFillPopup && (
-            <div className="absolute right-4 top-4 w-72 bg-card border border-border rounded-xl shadow-2xl p-4 z-30 animate-in fade-in slide-in-from-top-2">
-              <h4 className="font-semibold mb-2">Auto-fill remaining colors?</h4>
-              <p className="text-sm text-muted-foreground mb-3">
-                The AI will generate matching colors for the other blocks.
-              </p>
-              <input
-                type="text"
-                placeholder="Optional: Enter description..."
-                value={autoFillPrompt}
-                onChange={(e) => setAutoFillPrompt(e.target.value)}
-                className="w-full px-3 py-2 bg-muted border border-border rounded-lg text-sm mb-3"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowAutoFillPopup(false)}
-                  className="flex-1 px-3 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors text-sm"
-                >
-                  No
-                </button>
-                <button
-                  onClick={handleAutoFill}
-                  className="flex-1 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity text-sm flex items-center justify-center gap-1"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  Yes
-                </button>
               </div>
             </div>
-          )}
-        </div>
-      </div>
+            <div className="flex items-center gap-2">
+              {!isDesktop && (
+                <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+                  <SheetTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MessageCircle className="w-4 h-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="right" className="p-0 w-96">
+                    {chatContent}
+                  </SheetContent>
+                </Sheet>
+              )}
+              {isDesktop && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsChatOpen((v) => !v)}
+                >
+                  {isChatOpen ? (
+                    <PanelRightOpen className="w-4 h-4" />
+                  ) : (
+                    <MessageCircle className="w-4 h-4" />
+                  )}
+                </Button>
+              )}
+            </div>
+          </div>
 
-      {/* Footer */}
-      <footer className="flex items-center justify-center px-6 py-4 bg-card border-t border-border">
-        <button
-          onClick={generateNewPalette}
-          className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all glow-primary"
-        >
-          <RefreshCw className="w-4 h-4" />
-          Generate
-          <span className="ml-2 px-2 py-0.5 text-xs bg-primary-foreground/20 rounded">Space</span>
-        </button>
-      </footer>
+          <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex">
+              <div className="flex-1 flex gap-0 overflow-hidden">
+                {colorSlots.map((slot, idx) => {
+                  const isSelected = idx === selected;
+                  const textColor = contrastColor(slot.color);
+                  return (
+                    <div
+                      key={idx}
+                      className={`relative flex-1 min-w-[120px] transition-all duration-200 cursor-pointer ${
+                        isSelected ? "ring-4 ring-primary ring-inset" : ""
+                      }`}
+                      style={{ backgroundColor: slot.color }}
+                      onClick={() => handlePaletteClick(idx)}
+                    >
+                      <div className="absolute inset-0 flex flex-col justify-center items-center gap-3 text-center">
+                        <div
+                          className="text-lg font-semibold font-mono px-3 py-1 rounded-full bg-black/20 backdrop-blur-sm"
+                          style={{ color: textColor }}
+                        >
+                          {slot.color}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="bg-black/25 text-white border-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(slot.color);
+                              toast.success(`Copied ${slot.color}`);
+                            }}
+                          >
+                            <Copy className="w-4 h-4 mr-1" />
+                            Copy
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="bg-black/25 text-white border-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setColorAt(idx, adjustColor(slot.color, "pastel"));
+                            }}
+                          >
+                            <Wand2 className="w-4 h-4 mr-1" />
+                            Tweak
+                          </Button>
+                        </div>
+                      </div>
+                      {slot.locked && (
+                        <div
+                          className="absolute top-4 right-4 rounded-full px-3 py-1 text-xs font-medium bg-black/30 backdrop-blur-sm"
+                          style={{ color: textColor }}
+                        >
+                          <Lock className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {isDesktop && isChatOpen && (
+                <aside className="w-80 border-l border-border bg-card/70 backdrop-blur">
+                  {chatContent}
+                </aside>
+              )}
+            </div>
+
+            <footer className="border-t border-border bg-card/80 backdrop-blur px-4 py-3">
+              <div className="flex flex-wrap gap-2 items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => moveSlot(-1)}
+                  disabled={selected <= 0}
+                >
+                  <MoveLeft className="w-4 h-4 mr-2" />
+                  Move left
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => moveSlot(1)}
+                  disabled={selected >= colorSlots.length - 1}
+                >
+                  <MoveRight className="w-4 h-4 mr-2" />
+                  Move right
+                </Button>
+                <Button
+                  variant={selectedSlot?.locked ? "secondary" : "outline"}
+                  size="sm"
+                  onClick={toggleLock}
+                >
+                  {selectedSlot?.locked ? (
+                    <>
+                      <Unlock className="w-4 h-4 mr-2" />
+                      Unlock
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-4 h-4 mr-2" />
+                      Lock
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" size="sm" onClick={copyColor}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy color (C)
+                </Button>
+                <Button variant="outline" size="sm" onClick={copyPalette}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy JSON
+                </Button>
+                <Button variant="outline" size="sm" onClick={copyPaletteCsv}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={savePalette}>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save
+                </Button>
+                <div className="ml-auto flex gap-2">
+                  <Button onClick={regenerate}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Regenerate (Space)
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => applyAdjustment("pastel", "all")}
+                  >
+                    <ArrowLeftRight className="w-4 h-4 mr-2" />
+                    Harmonize
+                  </Button>
+                </div>
+              </div>
+            </footer>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

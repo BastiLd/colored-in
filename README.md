@@ -98,3 +98,9 @@ Use Stripe test cards for development:
 - Decline: `4000 0000 0000 0002`
 
 See [Stripe Testing Docs](https://stripe.com/docs/testing) for more test cards.
+
+## Pro Manual Builder (paid plans)
+
+- The upgraded Canva-style manual builder is available to paid plans (Pro, Ultra, Individual).
+- Access it via `Dashboard → Generate Palette` (paid users are routed to the new builder; free users keep the classic generator with an upgrade CTA).
+- Shortcuts: `Space` regenerate, `L` lock/unlock selected color, `C` copy selected color.

@@ -16,6 +16,7 @@ type DashboardView = "home" | "my-palettes" | "explore" | "generator" | "generat
 interface UserProfile {
   email: string | null;
   plan: string;
+  is_active?: boolean;
 }
 
 interface SavedPalette {
@@ -70,7 +71,7 @@ const Dashboard = () => {
           .single(),
         supabase
           .from("user_subscriptions")
-          .select("plan")
+          .select("plan, is_active")
           .eq("user_id", userId)
           .single(),
         supabase
@@ -83,6 +84,7 @@ const Dashboard = () => {
       setProfile({
         email: profileResult.data?.email ?? user?.email ?? null,
         plan: subscriptionResult.data?.plan ?? "free",
+        is_active: subscriptionResult.data?.is_active ?? false,
       });
 
       if (genResult.data) {
@@ -154,7 +156,10 @@ const Dashboard = () => {
     );
   }
 
-  const isPaidPlan = profile?.plan && profile.plan !== "free";
+  const isPaidPlan =
+    profile?.plan &&
+    profile.plan !== "free" &&
+    (profile.is_active ?? false);
 
   const renderContent = () => {
     switch (currentView) {
