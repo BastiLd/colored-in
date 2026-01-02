@@ -9,14 +9,22 @@
       // Inspired by https://github.com/rafgraph/spa-github-pages
       (function () {
         var l = window.location;
-        // If we're already on root, do nothing.
-        if (!l.pathname) return;
         var base = "/colored-in";
         var path = l.pathname;
+        
+        // If we're already on root or base, do nothing.
+        if (path === "/" || path === base || path === base + "/") return;
+        
         // Ensure path is relative to the repo base.
         if (path.indexOf(base) === 0) {
           path = path.slice(base.length);
         }
+        
+        // Normalize path (ensure it starts with /)
+        if (!path.startsWith("/")) {
+          path = "/" + path;
+        }
+        
         var redirect = base + "/?p=" + encodeURIComponent(path + l.search + l.hash);
         l.replace(redirect);
       })();
