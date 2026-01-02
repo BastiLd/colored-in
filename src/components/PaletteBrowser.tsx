@@ -28,6 +28,11 @@ function PaletteCard({
 }) {
   const [hoveredColor, setHoveredColor] = useState<number | null>(null);
 
+  // Reset hover state when palette changes
+  useEffect(() => {
+    setHoveredColor(null);
+  }, [palette.id]);
+
   const copyColor = (e: React.MouseEvent, color: string) => {
     e.stopPropagation();
     navigator.clipboard.writeText(color);
@@ -41,29 +46,32 @@ function PaletteCard({
     >
       {/* Color Preview - Coolors style: tall strips, no gaps */}
       <div className="flex h-20 sm:h-24 overflow-hidden rounded-lg">
-        {palette.colors.map((color, i) => (
-          <div
-            key={`${palette.id}-color-${i}`}
-            className="relative flex-1 transition-all duration-200 group-hover:first:flex-[1.1] group-hover:last:flex-[1.1]"
-            style={{ backgroundColor: color }}
-            onMouseEnter={() => setHoveredColor(i)}
-            onMouseLeave={() => setHoveredColor(null)}
-            onClick={(e) => copyColor(e, color)}
-          >
-            {hoveredColor === i && (
-              <div 
-                className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px] z-10"
-              >
-                <span 
-                  className="text-[10px] sm:text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-black/30"
-                  style={{ color: '#FFFFFF' }}
+        {palette.colors && palette.colors.length > 0 ? palette.colors.map((color, i) => {
+          const isHovered = hoveredColor === i;
+          return (
+            <div
+              key={`${palette.id}-color-${i}`}
+              className="relative flex-1 transition-all duration-200 group-hover:first:flex-[1.1] group-hover:last:flex-[1.1] cursor-pointer"
+              style={{ backgroundColor: color || '#000000' }}
+              onMouseEnter={() => setHoveredColor(i)}
+              onMouseLeave={() => setHoveredColor(null)}
+              onClick={(e) => copyColor(e, color)}
+            >
+              {isHovered && color && (
+                <div 
+                  className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px] z-10 pointer-events-none"
                 >
-                  {color.replace('#', '').toUpperCase()}
-                </span>
-              </div>
-            )}
-          </div>
-        ))}
+                  <span 
+                    className="text-[10px] sm:text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-black/30"
+                    style={{ color: '#FFFFFF' }}
+                  >
+                    {color.replace('#', '').toUpperCase()}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        }) : null}
       </div>
 
       {/* Info - minimal like Coolors */}
