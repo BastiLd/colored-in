@@ -1,3 +1,9 @@
+// NOTE: Supabase Edge Functions run on Deno, but this repo’s TypeScript tooling
+// (Vite/tsconfig) doesn’t include Deno globals. This shim fixes editor/TS errors
+// like “Cannot find name 'Deno'” without affecting runtime behavior.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any;
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, stripe-signature',
