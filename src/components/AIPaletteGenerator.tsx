@@ -244,7 +244,15 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
 
     try {
       // Get the current session to ensure auth token is available
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        toast.error("Authentication error. Please sign in again.");
+        setIsLoading(false);
+        navigate("/auth");
+        return;
+      }
       
       if (!session) {
         toast.error("Session expired. Please sign in again.");
@@ -252,12 +260,24 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
         navigate("/auth");
         return;
       }
+
+      console.log('Invoking generate-palette function with prompt:', prompt.trim().substring(0, 50));
       
       const { data, error } = await supabase.functions.invoke('generate-palette', {
         body: { prompt: prompt.trim() }
       });
 
+      console.log('Function response:', { hasData: !!data, hasError: !!error, error });
+
       if (error) {
+        console.error('Supabase function error:', error);
+        // Check for specific error types
+        if (error.message?.includes('Failed to send') || error.message?.includes('fetch')) {
+          throw new Error("Cannot reach the AI service. Please check your internet connection and try again.");
+        }
+        if (error.message?.includes('404') || error.message?.includes('not found')) {
+          throw new Error("AI service is not available. Please contact support.");
+        }
         throw error;
       }
       
@@ -269,6 +289,7 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
       }
 
       if (!data || !data.colors || !Array.isArray(data.colors)) {
+        console.error('Invalid data format:', data);
         throw new Error("Invalid response from server");
       }
 
@@ -282,7 +303,16 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
       toast.success("Palette created and added to public collection!", { duration: 2000 });
     } catch (error: any) {
       console.error('Error generating palette:', error);
-      const errorMessage = error?.message || error?.error || "Failed to generate palette. Please try again.";
+      let errorMessage = "Failed to generate palette. Please try again.";
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.error) {
+        errorMessage = error.error;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
       toast.error(errorMessage);
     } finally {
       setIsLoading(false);
