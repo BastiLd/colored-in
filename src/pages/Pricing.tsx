@@ -262,6 +262,10 @@ export default function Pricing() {
   }, [searchParams]);
 
   const handleSubscribe = async (planKey: string) => {
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:264',message:'handleSubscribe called',data:{planKey,isLoggedIn},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
     // If not logged in, redirect to auth
     if (!isLoggedIn) {
       toast.info("Please sign in to subscribe to a plan.");
@@ -273,77 +277,94 @@ export default function Pricing() {
     setLoadingPlan(planKey);
 
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Always refresh session to ensure we have the latest valid token
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:280',message:'refreshing session before checkout',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
       
-      if (!session) {
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      
+      // If refresh fails, try getSession as fallback
+      let activeSession = session;
+      if (!activeSession || sessionError) {
+        const { data: { session: fallbackSession } } = await supabase.auth.getSession();
+        activeSession = fallbackSession;
+      }
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:290',message:'session retrieved',data:{hasSession:!!activeSession,sessionError:sessionError?.message,userId:activeSession?.user?.id,expiresAt:activeSession?.expires_at,tokenPreview:activeSession?.access_token?.slice(0,20)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,E'})}).catch(()=>{});
+      // #endregion
+      
+      if (!activeSession) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:295',message:'no session found',data:{sessionError:sessionError?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         toast.error("Please sign in to continue.");
         navigate("/auth");
         return;
       }
-
-      // Check if token is expired
-      const now = Math.floor(Date.now() / 1000);
-      const isExpired = session.expires_at ? session.expires_at < now : false;
-
-      // Try to refresh if expired
-      if (isExpired) {
-        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-        if (refreshError || !refreshedSession) {
-          toast.error("Session expired. Please sign in again.");
-          navigate("/auth");
-          return;
-        }
-      }
-
-      const activeSession = isExpired ? (await supabase.auth.getSession()).data.session : session;
       if (!activeSession) {
         toast.error("Please sign in to continue.");
         navigate("/auth");
         return;
       }
 
-      // Use direct fetch to get detailed error information
-      const supabaseUrl = supabaseConfig.url;
-      if (!supabaseUrl) {
-        toast.error("Supabase configuration error. Please check your environment variables.");
-        return;
+      // Decode JWT to check project match
+      let jwtPayload = null;
+      try {
+        const tokenParts = activeSession.access_token.split('.');
+        if (tokenParts.length === 3) {
+          const payloadBase64 = tokenParts[1].replace(/-/g, '+').replace(/_/g, '/');
+          const payloadJson = atob(payloadBase64);
+          jwtPayload = JSON.parse(payloadJson);
+        }
+      } catch (e) {
+        // Ignore decode errors
       }
 
-      const functionUrl = `${supabaseUrl}/functions/v1/create-checkout`;
-      const response = await fetch(functionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${activeSession.access_token}`,
-          'apikey': (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string,
-        },
-        body: JSON.stringify({
+      // Extract project ID from Supabase URL
+      const urlMatch = supabaseConfig.url?.match(/https:\/\/([^.]+)\.supabase\.co/);
+      const projectIdFromUrl = urlMatch ? urlMatch[1] : null;
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:316',message:'calling edge function',data:{planKey,hasToken:!!activeSession.access_token,tokenLength:activeSession.access_token?.length,supabaseUrl:supabaseConfig.url,projectIdFromUrl,jwtProjectId:jwtPayload?.aud,jwtIssuer:jwtPayload?.iss,jwtExp:jwtPayload?.exp,jwtIat:jwtPayload?.iat},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D,F'})}).catch(()=>{});
+      // #endregion
+
+      // Use Supabase client's invoke method which handles JWT correctly
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:333',message:'invoking edge function via supabase client',data:{planKey,hasSession:!!activeSession},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'})}).catch(()=>{});
+      // #endregion
+
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
           planKey,
           successUrl: `${window.location.origin}${import.meta.env.BASE_URL}dashboard?checkout=success`,
           cancelUrl: `${window.location.origin}${import.meta.env.BASE_URL}pricing?checkout=canceled`,
-        }),
+        },
       });
 
-      const responseText = await response.text();
-      let responseJson = null;
-      try {
-        responseJson = JSON.parse(responseText);
-      } catch {
-        responseJson = { error: responseText || 'Unknown error' };
-      }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:345',message:'edge function response',data:{hasData:!!data,hasError:!!error,errorMessage:error?.message,errorContext:error?.context,errorStatus:error?.status,dataPreview:data ? JSON.stringify(data).slice(0,200) : null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C,D'})}).catch(()=>{});
+      // #endregion
 
-      if (!response.ok) {
-        const errorData = responseJson || { error: responseText || 'Unknown error' };
-        throw new Error(errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      if (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:352',message:'edge function error',data:{errorMessage:error.message,errorContext:error.context,errorStatus:error.status,errorName:error.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
+        // #endregion
+        throw error;
       }
-
-      const data = responseJson;
       if (data?.url) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:357',message:'redirecting to stripe',data:{url:data.url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         window.location.href = data.url;
       } else {
         toast.error("Failed to create checkout session.");
       }
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:340',message:'subscription error caught',data:{errorMessage:error instanceof Error ? error.message : String(error),errorStack:error instanceof Error ? error.stack : null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B,C'})}).catch(()=>{});
+      // #endregion
       console.error("Subscription error:", error);
       toast.error("Something went wrong. Please try again.");
     } finally {

@@ -5,8 +5,8 @@ project_id = "gevqwporirhaekapftib"
 verify_jwt = true
 
 [functions.create-checkout]
-# Requires authentication - users must be logged in to create a checkout session
-# Temporarily disabled to debug JWT verification issue - function code will verify manually
+# JWT verification is handled manually in the function code (see create-checkout/index.ts)
+# Setting verify_jwt = false allows the function to run and perform its own verification
 verify_jwt = false
 
 [functions.stripe-webhook]

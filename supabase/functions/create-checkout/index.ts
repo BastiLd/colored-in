@@ -11,12 +11,22 @@ Deno.serve((req) => {
 
   return (async () => {
     try {
+      // #region agent log
+      const log1 = {location:'create-checkout/index.ts:12',message:'edge function entry',data:{method:req.method,hasAuthHeader:!!req.headers.get('Authorization')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+      await fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(log1)}).catch(()=>{});
+      // #endregion
+
       const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
       const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
       const pricePro = Deno.env.get('STRIPE_PRICE_PRO')!;
       const priceUltra = Deno.env.get('STRIPE_PRICE_ULTRA')!;
       const priceIndividual = Deno.env.get('STRIPE_PRICE_INDIVIDUAL')!;
+
+      // #region agent log
+      const log2 = {location:'create-checkout/index.ts:20',message:'env vars check',data:{hasStripeKey:!!stripeKey,hasSupabaseUrl:!!supabaseUrl,hasSupabaseKey:!!supabaseKey,hasPricePro:!!pricePro,hasPriceUltra:!!priceUltra,hasPriceIndividual:!!priceIndividual},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'};
+      await fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(log2)}).catch(()=>{});
+      // #endregion
 
       if (!stripeKey) {
         return new Response(JSON.stringify({ error: 'Service unavailable' }), {
@@ -26,6 +36,11 @@ Deno.serve((req) => {
       }
 
       const auth = req.headers.get('Authorization');
+      // #region agent log
+      const log3 = {location:'create-checkout/index.ts:30',message:'auth header check',data:{hasAuth:!!auth,authPreview:auth ? auth.slice(0,30) + '...' : null},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'};
+      await fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(log3)}).catch(()=>{});
+      // #endregion
+      
       if (!auth) {
         return new Response(JSON.stringify({ error: 'Auth required' }), {
           status: 401,
@@ -34,11 +49,26 @@ Deno.serve((req) => {
       }
 
       const token = auth.replace('Bearer ', '');
+      // #region agent log
+      const log4 = {location:'create-checkout/index.ts:40',message:'verifying token with supabase',data:{tokenLength:token.length,tokenPreview:token.slice(0,20) + '...',supabaseUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'};
+      await fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(log4)}).catch(()=>{});
+      // #endregion
+      
       const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
         headers: { Authorization: `Bearer ${token}`, apikey: supabaseKey },
       });
 
+      // #region agent log
+      const log5 = {location:'create-checkout/index.ts:46',message:'supabase auth response',data:{status:userRes.status,statusText:userRes.statusText,ok:userRes.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'};
+      await fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(log5)}).catch(()=>{});
+      // #endregion
+
       if (!userRes.ok) {
+        const errorBody = await userRes.text();
+        // #region agent log
+        const log6 = {location:'create-checkout/index.ts:51',message:'token verification failed',data:{status:userRes.status,errorBody:errorBody.slice(0,200)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A,B'};
+        await fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(log6)}).catch(()=>{});
+        // #endregion
         return new Response(JSON.stringify({ error: 'Invalid auth' }), {
           status: 401,
           headers: corsHeaders,
