@@ -248,6 +248,7 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
       
       if (!session) {
         toast.error("Session expired. Please sign in again.");
+        setIsLoading(false);
         navigate("/auth");
         return;
       }
@@ -256,12 +257,19 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
         body: { prompt: prompt.trim() }
       });
 
-      if (error) throw error;
-      if (data.error) {
+      if (error) {
+        throw error;
+      }
+      
+      if (data?.error) {
         if (data.limitReached) {
           setHasReachedLimit(true);
         }
         throw new Error(data.error);
+      }
+
+      if (!data || !data.colors || !Array.isArray(data.colors)) {
+        throw new Error("Invalid response from server");
       }
 
       setGeneratedPalette(data);
@@ -274,7 +282,8 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
       toast.success("Palette created and added to public collection!", { duration: 2000 });
     } catch (error: any) {
       console.error('Error generating palette:', error);
-      toast.error(error.message || "Failed to generate palette. Please try again.");
+      const errorMessage = error?.message || error?.error || "Failed to generate palette. Please try again.";
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
