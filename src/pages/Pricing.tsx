@@ -2,7 +2,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, Sparkles, Zap, Crown, Rocket, ArrowLeft, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, supabaseConfig } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 interface PlanFeature {
@@ -101,7 +101,7 @@ const plans: Plan[] = [
 
 // Temporary safety switch: checkout is currently blocked by the backend ("Invalid JWT" from Edge Functions).
 // We disable paid-plan CTAs until the Supabase auth / Edge Function config is fixed.
-const CHECKOUT_ENABLED = false;
+const CHECKOUT_ENABLED = true; // Re-enabled for debugging
 
 interface PlanCardProps {
   plan: Plan;
@@ -273,7 +273,7 @@ export default function Pricing() {
     setLoadingPlan(planKey);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (!session) {
         toast.error("Please sign in to continue.");
@@ -281,8 +281,68 @@ export default function Pricing() {
         return;
       }
 
-      toast.info("Payments are temporarily disabled — we’re working on it.");
-      return;
+      // Check if token is expired
+      const now = Math.floor(Date.now() / 1000);
+      const isExpired = session.expires_at ? session.expires_at < now : false;
+
+      // Try to refresh if expired
+      if (isExpired) {
+        const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshedSession) {
+          toast.error("Session expired. Please sign in again.");
+          navigate("/auth");
+          return;
+        }
+      }
+
+      const activeSession = isExpired ? (await supabase.auth.getSession()).data.session : session;
+      if (!activeSession) {
+        toast.error("Please sign in to continue.");
+        navigate("/auth");
+        return;
+      }
+
+      // Use direct fetch to get detailed error information
+      const supabaseUrl = supabaseConfig.url;
+      if (!supabaseUrl) {
+        toast.error("Supabase configuration error. Please check your environment variables.");
+        return;
+      }
+
+      const functionUrl = `${supabaseUrl}/functions/v1/create-checkout`;
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeSession.access_token}`,
+          'apikey': (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string,
+        },
+        body: JSON.stringify({
+          planKey,
+          successUrl: `${window.location.origin}${import.meta.env.BASE_URL}dashboard?checkout=success`,
+          cancelUrl: `${window.location.origin}${import.meta.env.BASE_URL}pricing?checkout=canceled`,
+        }),
+      });
+
+      const responseText = await response.text();
+      let responseJson = null;
+      try {
+        responseJson = JSON.parse(responseText);
+      } catch {
+        responseJson = { error: responseText || 'Unknown error' };
+      }
+
+      if (!response.ok) {
+        const errorData = responseJson || { error: responseText || 'Unknown error' };
+        throw new Error(errorData.error || errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const data = responseJson;
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        toast.error("Failed to create checkout session.");
+      }
     } catch (error) {
       console.error("Subscription error:", error);
       toast.error("Something went wrong. Please try again.");
