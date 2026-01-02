@@ -43,7 +43,7 @@ function PaletteCard({
       <div className="flex h-20 sm:h-24 overflow-hidden rounded-lg">
         {palette.colors.map((color, i) => (
           <div
-            key={i}
+            key={`${palette.id}-color-${i}`}
             className="relative flex-1 transition-all duration-200 group-hover:first:flex-[1.1] group-hover:last:flex-[1.1]"
             style={{ backgroundColor: color }}
             onMouseEnter={() => setHoveredColor(i)}
@@ -52,7 +52,7 @@ function PaletteCard({
           >
             {hoveredColor === i && (
               <div 
-                className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px]"
+                className="absolute inset-0 flex items-center justify-center bg-black/10 backdrop-blur-[1px] z-10"
               >
                 <span 
                   className="text-[10px] sm:text-xs font-mono font-semibold px-1.5 py-0.5 rounded bg-black/30"
