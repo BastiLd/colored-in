@@ -271,6 +271,17 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
 
       if (error) {
         console.error('Supabase function error:', error);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const status = (error as any)?.context?.status as number | undefined;
+        if (status === 401) {
+          toast.error("Session expired. Please sign in again.");
+          navigate("/auth");
+          return;
+        }
+        if (status === 403) {
+          toast.error("Access denied. Please check your plan or sign in again.");
+          return;
+        }
         // Check for specific error types
         if (error.message?.includes('Failed to send') || error.message?.includes('fetch')) {
           throw new Error("Cannot reach the AI service. Please check your internet connection and try again.");
