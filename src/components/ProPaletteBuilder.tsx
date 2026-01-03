@@ -899,6 +899,7 @@ export function ProPaletteBuilder({
   );
 
   return (
+    <>
     <div className="h-screen flex flex-col bg-background">
       <header className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border bg-card/80 backdrop-blur">
         <div className="flex items-center gap-3">
@@ -1264,5 +1265,6 @@ export function ProPaletteBuilder({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
