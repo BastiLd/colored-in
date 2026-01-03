@@ -10,7 +10,6 @@ import {
   MessageCircle,
   PanelLeftOpen,
   PanelRightOpen,
-  Wand2,
   MoveLeft,
   MoveRight,
   Palette as PaletteIcon,
@@ -18,7 +17,6 @@ import {
   ListFilter,
   Send,
   Droplets,
-  Layers,
   Image,
   Loader2,
 } from "lucide-react";
@@ -56,7 +54,7 @@ interface ProPaletteBuilderProps {
 }
 
 type ChatMode = "ask" | "edit";
-type SidebarTab = "palettes" | "colors" | "templates" | "assets";
+type SidebarTab = "palettes" | "colors" | "assets";
 type EditScope = "selected" | "all";
 
 interface ChatMessage {
@@ -342,7 +340,7 @@ export function ProPaletteBuilder({
     return hslToHex(hsl);
   };
 
-  // Real harmonize function - creates analogous color scheme based on selected color
+  // Real harmonize function - pulls all colors towards selected color's hue family
   const harmonizePalette = useCallback(() => {
     if (selected === null || !selectedSlot) {
       toast.info("Select a base color first", { position: TOAST_POSITION });
@@ -350,38 +348,38 @@ export function ProPaletteBuilder({
     }
     
     const baseHsl = hexToHsl(selectedSlot.color);
-    const numColors = colorSlots.length;
-    
-    // Create analogous harmony: spread colors around the base hue
-    const hueStep = 30; // 30 degrees between each color for analogous
-    const startOffset = -((numColors - 1) / 2) * hueStep;
     
     setColorSlots((prev) =>
       prev.map((slot, idx) => {
-        if (slot.locked) return slot;
-        if (idx === selected) return slot; // Keep selected color as-is
+        if (slot.locked || idx === selected) return slot;
         
-        // Calculate new hue based on position relative to selected
-        const offset = (idx - selected) * hueStep;
-        const newHue = (baseHsl.h + offset + 360) % 360;
+        const currentHsl = hexToHsl(slot.color);
         
-        // Keep similar saturation and lightness, with slight variation
-        const satVariation = (Math.random() - 0.5) * 10;
-        const lightVariation = (Math.random() - 0.5) * 10;
+        // Pull hue 60% towards base color
+        const hueDiff = baseHsl.h - currentHsl.h;
+        let newHue = currentHsl.h + (hueDiff * 0.6);
+        
+        // Add variation based on position for interest
+        const variation = (idx - selected) * 10;
+        newHue = (newHue + variation + 360) % 360;
+        
+        // Slightly adjust saturation/lightness towards base
+        const newSat = currentHsl.s + (baseHsl.s - currentHsl.s) * 0.3;
+        const newLight = currentHsl.l + (baseHsl.l - currentHsl.l) * 0.2;
         
         return {
           ...slot,
           color: hslToHex({
             h: newHue,
-            s: clamp(baseHsl.s + satVariation, 20, 90),
-            l: clamp(baseHsl.l + lightVariation, 25, 85),
+            s: clamp(newSat, 10, 100),
+            l: clamp(newLight, 15, 90),
           }),
         };
       })
     );
     
     toast.success("Palette harmonized", { duration: 1500, position: TOAST_POSITION });
-  }, [selected, selectedSlot, colorSlots.length]);
+  }, [selected, selectedSlot]);
 
   const applyAdjustment = useCallback(
     (intent: "warmer" | "cooler" | "pastel" | "contrast") => {
@@ -399,22 +397,39 @@ export function ProPaletteBuilder({
           prev.map((slot, idx) => {
             if (slot.locked) return slot;
             
-            // Apply the adjustment to each color
-            const adjustedColor = adjustColor(slot.color, intent);
-            const adjustedHsl = hexToHsl(adjustedColor);
+            const currentHsl = hexToHsl(slot.color);
             
-            // Also shift the hue towards the base color for harmony
-            const hueDiff = baseHsl.h - adjustedHsl.h;
-            const hueShift = hueDiff * 0.3; // 30% shift towards base
+            // Apply the adjustment
+            let adjustedHsl = { ...currentHsl };
             
-            return {
-              ...slot,
-              color: hslToHex({
-                h: (adjustedHsl.h + hueShift + 360) % 360,
-                s: adjustedHsl.s,
-                l: adjustedHsl.l,
-              }),
-            };
+            switch (intent) {
+              case "warmer":
+                // Shift hue towards warmer (red/orange direction)
+                adjustedHsl.h = (adjustedHsl.h + 15) % 360;
+                // Pull colors closer to base color's warmth for harmony
+                const warmthDiff = baseHsl.h - adjustedHsl.h;
+                adjustedHsl.h = (adjustedHsl.h + warmthDiff * 0.2 + 360) % 360; // 20% shift towards base
+                break;
+              case "cooler":
+                // Shift hue towards cooler (blue/green direction)
+                adjustedHsl.h = (adjustedHsl.h - 15 + 360) % 360;
+                const coolDiff = baseHsl.h - adjustedHsl.h;
+                adjustedHsl.h = (adjustedHsl.h + coolDiff * 0.2 + 360) % 360;
+                break;
+              case "pastel":
+                adjustedHsl.s = clamp(adjustedHsl.s - 20);
+                adjustedHsl.l = clamp(adjustedHsl.l + 15);
+                // Harmonize saturation slightly towards base
+                const satDiff = baseHsl.s - adjustedHsl.s;
+                adjustedHsl.s = clamp(adjustedHsl.s + satDiff * 0.15);
+                break;
+              case "contrast":
+                adjustedHsl.s = clamp(adjustedHsl.s + 15);
+                adjustedHsl.l = clamp(adjustedHsl.l + (adjustedHsl.l < 50 ? -10 : 10));
+                break;
+            }
+            
+            return { ...slot, color: hslToHex(adjustedHsl) };
           })
         );
       } else {
@@ -558,7 +573,7 @@ export function ProPaletteBuilder({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="grid grid-cols-3 gap-2 text-sm">
           <button
             onClick={() => setSidebarTab("palettes")}
             className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
@@ -580,17 +595,6 @@ export function ProPaletteBuilder({
           >
             <Droplets className="w-4 h-4" />
             Colors
-          </button>
-          <button
-            onClick={() => setSidebarTab("templates")}
-            className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
-              sidebarTab === "templates" 
-                ? "bg-primary text-primary-foreground" 
-                : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            Templates
           </button>
           <button
             onClick={() => setSidebarTab("assets")}
@@ -646,17 +650,6 @@ export function ProPaletteBuilder({
                 className="w-full h-24 p-1 cursor-pointer"
               />
               <p className="text-xs">Select a color slot, then pick a color above.</p>
-            </div>
-          )}
-          {sidebarTab === "templates" && (
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Coming soon</p>
-              <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
-                Template presets
-              </div>
-              <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
-                Brand kits
-              </div>
             </div>
           )}
           {sidebarTab === "assets" && (
@@ -941,19 +934,6 @@ export function ProPaletteBuilder({
                           >
                             <Copy className="w-4 h-4 mr-1" />
                             Copy
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            className="bg-black/25 text-white border-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setColorAt(idx, adjustColor(slot.color, "pastel"));
-                              toast.success("Color tweaked", { position: TOAST_POSITION });
-                            }}
-                          >
-                            <Wand2 className="w-4 h-4 mr-1" />
-                            Tweak
                           </Button>
                         </div>
                       </div>

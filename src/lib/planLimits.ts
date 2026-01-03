@@ -2,6 +2,8 @@ export const PLAN_LIMITS = {
   free: {
     palettesPerMonth: 1,
     chatMessagesPerMonth: 0,
+    maxImages: 0,
+    maxLinks: 0,
     features: {
       askMode: false,
       proBuilder: false,
@@ -11,6 +13,8 @@ export const PLAN_LIMITS = {
   pro: {
     palettesPerMonth: 50,
     chatMessagesPerMonth: 30,
+    maxImages: 1,
+    maxLinks: 1,
     features: {
       askMode: true,
       proBuilder: true,
@@ -20,6 +24,8 @@ export const PLAN_LIMITS = {
   ultra: {
     palettesPerMonth: 500,
     chatMessagesPerMonth: 100,
+    maxImages: 2,
+    maxLinks: 3,
     features: {
       askMode: true,
       proBuilder: true,
@@ -29,6 +35,8 @@ export const PLAN_LIMITS = {
   individual: {
     palettesPerMonth: 2500,
     chatMessagesPerMonth: 300,
+    maxImages: Infinity,
+    maxLinks: Infinity,
     features: {
       askMode: true,
       proBuilder: true,
