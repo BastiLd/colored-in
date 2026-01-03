@@ -185,8 +185,8 @@ export function ProPaletteBuilder({
   // Tag filter state
   const [selectedTagsFilter, setSelectedTagsFilter] = useState<string[]>([]);
 
-  // Get palettes for sidebar
-  const allPalettes = useMemo(() => getFreePalettes().slice(0, 100), []);
+  // Get palettes for sidebar (searchable + scrollable through all palettes)
+  const allPalettes = useMemo(() => getFreePalettes(), []);
   
   const filteredPalettes = useMemo(() => {
     let result = allPalettes;
@@ -629,7 +629,7 @@ export function ProPaletteBuilder({
   };
 
   const sidebarContent = (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col min-h-0">
       <div className="p-4 border-b border-border space-y-3">
         <div className="flex items-center gap-2">
           <ListFilter className="w-4 h-4 text-muted-foreground" />
@@ -680,8 +680,8 @@ export function ProPaletteBuilder({
           </button>
         </div>
       </div>
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-3">
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-4 space-y-3 min-h-0">
           {sidebarTab === "palettes" && (
             <>
               <div className="space-y-2 mb-4">
@@ -764,7 +764,7 @@ export function ProPaletteBuilder({
   );
 
   const chatContent = (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col min-h-0">
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-primary" />
@@ -785,13 +785,17 @@ export function ProPaletteBuilder({
           </Button>
         )}
       </div>
-      <Tabs value={chatMode} onValueChange={(v) => setChatMode(v as ChatMode)}>
+      <Tabs
+        value={chatMode}
+        onValueChange={(v) => setChatMode(v as ChatMode)}
+        className="flex-1 flex flex-col min-h-0"
+      >
         <TabsList className="grid grid-cols-2 m-4">
           <TabsTrigger value="ask">Ask mode</TabsTrigger>
           <TabsTrigger value="edit">Edit mode</TabsTrigger>
         </TabsList>
-        <TabsContent value="ask" className="px-4 pb-4 flex-1 flex flex-col">
-          <ScrollArea className="flex-1 mb-4 max-h-[300px]">
+        <TabsContent value="ask" className="px-4 pb-4 flex-1 flex flex-col min-h-0">
+          <ScrollArea className="flex-1 min-h-0 mb-4">
             <div className="space-y-3">
               {chatMessages.length === 0 ? (
                 <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground space-y-2">
@@ -850,7 +854,7 @@ export function ProPaletteBuilder({
             </Button>
           </div>
         </TabsContent>
-        <TabsContent value="edit" className="px-4 pb-4 space-y-3">
+        <TabsContent value="edit" className="px-4 pb-4 space-y-3 flex-1 overflow-auto">
           <p className="text-sm text-muted-foreground">
             Quick edits apply to the {editScope === "selected" ? "selected color" : "whole palette"}.
           </p>
@@ -1099,7 +1103,7 @@ export function ProPaletteBuilder({
               )}
             </div>
 
-            <footer className="border-t border-border bg-card/80 backdrop-blur px-4 py-3">
+            <footer className="sticky bottom-0 z-10 border-t border-border bg-card/90 backdrop-blur px-4 py-3">
               <div className="flex items-center gap-2 overflow-x-auto flex-nowrap">
                 <Button
                   variant="outline"
