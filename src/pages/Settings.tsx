@@ -50,6 +50,7 @@ const Settings = () => {
   const [isCanceling, setIsCanceling] = useState(false);
   const [isLoadingPortal, setIsLoadingPortal] = useState(false);
   const [isDevUpdatingPlan, setIsDevUpdatingPlan] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [saveChatHistory, setSaveChatHistory] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
@@ -70,6 +71,13 @@ const Settings = () => {
         navigate("/auth");
         return;
       }
+
+      // Determine if current user is an admin (used for test tools)
+      const { data: adminFlag } = await supabase.rpc("has_role", {
+        _role: "admin",
+        _user_id: session.user.id,
+      });
+      setIsAdmin(Boolean(adminFlag));
 
       await refreshSubscription(session.user.id);
 
@@ -140,6 +148,36 @@ const Settings = () => {
       toast.success(`DEV: set plan to ${plan.toUpperCase()}`);
     } catch (e: any) {
       console.error("DEV set plan error:", e);
+      toast.error(e?.message || "Failed to update plan");
+    } finally {
+      setIsDevUpdatingPlan(false);
+    }
+  };
+
+  const setTestPlan = async (plan: "free" | "pro" | "ultra" | "individual") => {
+    if (!user?.id) {
+      toast.error("No user session found.");
+      return;
+    }
+    if (!isAdmin) {
+      toast.error("Admin privileges required.");
+      return;
+    }
+
+    setIsDevUpdatingPlan(true);
+    try {
+      const { data, error } = await supabase.rpc("admin_set_self_plan", {
+        _plan: plan,
+        _duration_days: 30,
+      });
+
+      if (error) throw error;
+
+      // Refresh UI
+      await refreshSubscription(user.id);
+      toast.success(`Test plan set to ${PLAN_NAMES[plan]}`);
+    } catch (e: any) {
+      console.error("Test plan switch error:", e);
       toast.error(e?.message || "Failed to update plan");
     } finally {
       setIsDevUpdatingPlan(false);
@@ -567,29 +605,47 @@ const Settings = () => {
           </div>
         </div>
 
-        {/* DEV Tools (local only) */}
-        {import.meta.env.DEV && (
+        {/* Safety Test Tools (admin only) */}
+        {isAdmin && (
           <div className="mt-6 bg-card border border-dashed border-border rounded-xl p-6">
-            <h3 className="font-medium mb-2">DEV Tools</h3>
+            <h3 className="font-medium mb-2">Safety Test Tools</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Local-only helpers for testing while Stripe is not enabled. This affects the
-              currently logged-in user only.
+              Admin-only plan switcher for testing features. This affects the currently logged-in user.
+              Remove this section later when Stripe is fully live.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button
-                onClick={() => setDevPlan("ultra")}
+                variant="outline"
+                onClick={() => setTestPlan("free")}
                 disabled={isDevUpdatingPlan}
               >
-                {isDevUpdatingPlan ? "Updating..." : "Grant ULTRA (30 days)"}
+                Set FREE
               </Button>
               <Button
-                variant="outline"
-                onClick={() => setDevPlan("free")}
+                onClick={() => setTestPlan("pro")}
                 disabled={isDevUpdatingPlan}
               >
-                Reset to FREE
+                Set PRO
+              </Button>
+              <Button
+                onClick={() => setTestPlan("ultra")}
+                disabled={isDevUpdatingPlan}
+              >
+                Set ULTRA
+              </Button>
+              <Button
+                onClick={() => setTestPlan("individual")}
+                disabled={isDevUpdatingPlan}
+              >
+                Set INDIVIDUAL
               </Button>
             </div>
+            {isDevUpdatingPlan && (
+              <div className="mt-3 text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Updating plan...
+              </div>
+            )}
           </div>
         )}
 
