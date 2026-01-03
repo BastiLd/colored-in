@@ -98,6 +98,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_assets: {
+        Row: {
+          id: string
+          user_id: string
+          asset_type: "image" | "link"
+          asset_url: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          asset_type: "image" | "link"
+          asset_url: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          asset_type?: "image" | "link"
+          asset_url?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       user_chat_history: {
         Row: {
           id: string

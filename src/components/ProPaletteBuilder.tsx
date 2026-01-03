@@ -19,11 +19,14 @@ import {
   Droplets,
   Image,
   Loader2,
+  X,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getRandomPalette, generateRandomColors, getFreePalettes, type Palette } from "@/data/palettes";
 import { supabase } from "@/integrations/supabase/client";
 import { getPlanLimits } from "@/lib/planLimits";
+import { AssetsPanel } from "@/components/AssetsPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,6 +44,18 @@ import {
 } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 interface ColorSlot {
   color: string;
@@ -61,6 +76,8 @@ interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+const PREDEFINED_TAGS = ["Warm", "Cool", "Pastel", "Vibrant", "Monochrome", "Contrast", "Nature", "Modern"];
 
 const DEFAULT_COLORS = getRandomPalette();
 
@@ -155,17 +172,43 @@ export function ProPaletteBuilder({
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [userPlan, setUserPlan] = useState<string>("free");
 
+  // Save modal states
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [savePaletteName, setSavePaletteName] = useState("");
+  const [savePaletteTags, setSavePaletteTags] = useState<string[]>([]);
+  const [customTag, setCustomTag] = useState("");
+  
+  // Primary color modal states
+  const [showPrimaryColorModal, setShowPrimaryColorModal] = useState(false);
+  const [primaryColor, setPrimaryColor] = useState("#3B82F6");
+  
+  // Tag filter state
+  const [selectedTagsFilter, setSelectedTagsFilter] = useState<string[]>([]);
+
   // Get palettes for sidebar
   const allPalettes = useMemo(() => getFreePalettes().slice(0, 100), []);
   
   const filteredPalettes = useMemo(() => {
-    if (!searchQuery.trim()) return allPalettes;
-    const query = searchQuery.toLowerCase();
-    return allPalettes.filter(p => 
-      p.name.toLowerCase().includes(query) ||
-      p.tags.some(t => t.toLowerCase().includes(query))
-    );
-  }, [allPalettes, searchQuery]);
+    let result = allPalettes;
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(query) ||
+        p.tags.some(t => t.toLowerCase().includes(query))
+      );
+    }
+    
+    // Filter by selected tags
+    if (selectedTagsFilter.length > 0) {
+      result = result.filter(p =>
+        selectedTagsFilter.some(tag => p.tags.includes(tag))
+      );
+    }
+    
+    return result;
+  }, [allPalettes, searchQuery, selectedTagsFilter]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -292,26 +335,43 @@ export function ProPaletteBuilder({
     toast.success("Copied palette CSV", { position: TOAST_POSITION });
   }, [colorSlots]);
 
-  const savePalette = useCallback(async () => {
+  const openSaveModal = useCallback(() => {
+    setShowSaveModal(true);
+    setSavePaletteName(`Manual palette ${new Date().toLocaleDateString()}`);
+    setSavePaletteTags([]);
+    setCustomTag("");
+  }, []);
+
+  const savePaletteWithName = useCallback(async () => {
     const { data: { session } = { session: null } } =
       await supabase.auth.getSession();
     if (!session) {
       toast.info("Sign in to save palettes.", { position: TOAST_POSITION });
       return;
     }
-    const name = `Manual palette ${new Date().toLocaleDateString()}`;
+    
+    if (!savePaletteName.trim()) {
+      toast.error("Please enter a palette name", { position: TOAST_POSITION });
+      return;
+    }
+    
     const { error } = await supabase.from("public_palettes").insert({
-      name,
+      name: savePaletteName,
       colors: colorSlots.map((c) => c.color),
-      tags: ["manual", "pro-builder"],
+      tags: [...savePaletteTags, "manual", "pro-builder"],
       created_by: session.user.id,
     });
+    
     if (error) {
       toast.error("Failed to save palette", { position: TOAST_POSITION });
       return;
     }
-    toast.success("Palette saved", { position: TOAST_POSITION });
-  }, [colorSlots]);
+    
+    toast.success("Palette saved!", { position: TOAST_POSITION });
+    setShowSaveModal(false);
+  }, [colorSlots, savePaletteName, savePaletteTags]);
+
+  const savePalette = openSaveModal;
 
   const setColorAt = useCallback((index: number, color: string) => {
     setColorSlots((prev) =>
@@ -613,6 +673,38 @@ export function ProPaletteBuilder({
         <div className="p-4 space-y-3">
           {sidebarTab === "palettes" && (
             <>
+              <div className="space-y-2 mb-4">
+                <p className="text-xs font-medium text-muted-foreground">Filter by tags</p>
+                <div className="flex flex-wrap gap-1">
+                  {PREDEFINED_TAGS.map(tag => (
+                    <Badge
+                      key={tag}
+                      variant={selectedTagsFilter.includes(tag) ? "default" : "outline"}
+                      className="cursor-pointer text-xs"
+                      onClick={() => {
+                        setSelectedTagsFilter(prev =>
+                          prev.includes(tag) 
+                            ? prev.filter(t => t !== tag)
+                            : [...prev, tag]
+                        );
+                      }}
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+                {selectedTagsFilter.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedTagsFilter([])}
+                    className="h-7 text-xs"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Clear filters
+                  </Button>
+                )}
+              </div>
               {filteredPalettes.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No palettes found.</p>
               ) : (
@@ -653,15 +745,7 @@ export function ProPaletteBuilder({
             </div>
           )}
           {sidebarTab === "assets" && (
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Coming soon</p>
-              <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
-                Asset library
-              </div>
-              <div className="rounded-lg bg-muted/50 border border-dashed border-border px-3 py-2">
-                Upload images
-              </div>
-            </div>
+            <AssetsPanel />
           )}
         </div>
       </ScrollArea>
@@ -831,6 +915,14 @@ export function ProPaletteBuilder({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowPrimaryColorModal(true)}
+          >
+            <Droplets className="w-4 h-4 mr-2" />
+            Primary Color
+          </Button>
           <Button variant="ghost" size="sm" onClick={onOldDesign}>
             Old builder
           </Button>
@@ -901,7 +993,8 @@ export function ProPaletteBuilder({
 
           <div className="flex-1 flex flex-col">
             <div className="flex-1 flex">
-              <div className="flex-1 flex gap-0 overflow-hidden">
+              <div className="flex-1 flex flex-col">
+                <div className="sticky top-0 z-10 flex gap-0 overflow-hidden shadow-md bg-background border-b border-border">
                 {colorSlots.map((slot, idx) => {
                   const isSelected = idx === selected;
                   const textColor = contrastColor(slot.color);
@@ -948,6 +1041,7 @@ export function ProPaletteBuilder({
                     </div>
                   );
                 })}
+              </div>
               </div>
               {isDesktop && isChatOpen && (
                 <aside className="w-80 border-l border-border bg-card/70 backdrop-blur">
@@ -1029,5 +1123,146 @@ export function ProPaletteBuilder({
 
       </div>
     </div>
+    
+    {/* Save Palette Modal */}
+    <Dialog open={showSaveModal} onOpenChange={setShowSaveModal}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Save Palette</DialogTitle>
+          <DialogDescription>
+            Give your palette a name and optionally add tags.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="palette-name">Palette Name</Label>
+            <Input
+              id="palette-name"
+              value={savePaletteName}
+              onChange={(e) => setSavePaletteName(e.target.value)}
+              placeholder="My Beautiful Palette"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Tags</Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {PREDEFINED_TAGS.map(tag => (
+                <Badge
+                  key={tag}
+                  variant={savePaletteTags.includes(tag) ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => {
+                    setSavePaletteTags(prev =>
+                      prev.includes(tag)
+                        ? prev.filter(t => t !== tag)
+                        : [...prev, tag]
+                    );
+                  }}
+                >
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add custom tag..."
+                value={customTag}
+                onChange={(e) => setCustomTag(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && customTag.trim()) {
+                    setSavePaletteTags(prev => [...prev, customTag.trim()]);
+                    setCustomTag("");
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  if (customTag.trim()) {
+                    setSavePaletteTags(prev => [...prev, customTag.trim()]);
+                    setCustomTag("");
+                  }
+                }}
+                disabled={!customTag.trim()}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+            {savePaletteTags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {savePaletteTags.map(tag => (
+                  <Badge key={tag} variant="secondary" className="text-xs">
+                    {tag}
+                    <X
+                      className="w-3 h-3 ml-1 cursor-pointer"
+                      onClick={() =>
+                        setSavePaletteTags(prev => prev.filter(t => t !== tag))
+                      }
+                    />
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowSaveModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={savePaletteWithName}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Palette
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    
+    {/* Primary Color Modal */}
+    <Dialog open={showPrimaryColorModal} onOpenChange={setShowPrimaryColorModal}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Select Primary Color</DialogTitle>
+          <DialogDescription>
+            Choose a base color that will be used as the foundation for your palette.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="primary-color">Primary Color</Label>
+            <Input
+              id="primary-color"
+              type="color"
+              value={primaryColor}
+              onChange={(e) => setPrimaryColor(e.target.value.toUpperCase())}
+              className="w-full h-32 p-2 cursor-pointer"
+            />
+            <p className="text-sm text-muted-foreground text-center">{primaryColor}</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowPrimaryColorModal(false)}>
+            Cancel
+          </Button>
+          <Button onClick={() => {
+            // Apply primary color to generate palette based on it
+            const hsl = hexToHsl(primaryColor);
+            const newColors = [];
+            for (let i = 0; i < 5; i++) {
+              const offset = (i - 2) * 30;
+              const newHue = (hsl.h + offset + 360) % 360;
+              const newColor = hslToHex({ h: newHue, s: hsl.s, l: hsl.l });
+              newColors.push({ color: newColor, locked: i === 2 });
+            }
+            setColorSlots(newColors);
+            setSelected(2);
+            setShowPrimaryColorModal(false);
+            toast.success("Palette generated from primary color", { position: TOAST_POSITION });
+          }}>
+            Generate Palette
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
