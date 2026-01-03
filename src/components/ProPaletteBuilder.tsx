@@ -558,7 +558,18 @@ export function ProPaletteBuilder({
       
       if (error) {
         console.error('Ask Mode error:', error);
-        toast.error(error.message || "Failed to get response", { position: TOAST_POSITION });
+        // Improve UX for expired/invalid sessions (common cause of 401/403)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const status = (error as any)?.context?.status as number | undefined;
+        if (status === 401) {
+          toast.error("Session expired. Please sign in again.", { position: TOAST_POSITION });
+        } else if (status === 403) {
+          toast.error("Access denied. Please check your plan or sign in again.", {
+            position: TOAST_POSITION,
+          });
+        } else {
+          toast.error(error.message || "Failed to get response", { position: TOAST_POSITION });
+        }
         // Remove the user message we added optimistically
         setChatMessages(prev => prev.slice(0, -1));
       } else {
@@ -995,27 +1006,64 @@ export function ProPaletteBuilder({
           <div className="flex-1 flex flex-col">
             <div className="flex-1 flex">
               <div className="flex-1 flex flex-col">
-                <div className="sticky top-0 z-10 flex gap-0 overflow-hidden shadow-md bg-background border-b border-border">
-                {colorSlots.map((slot, idx) => {
-                  const isSelected = idx === selected;
-                  const textColor = contrastColor(slot.color);
-                  return (
-                    <div
-                      key={idx}
-                      className={`relative flex-1 min-w-[120px] transition-all duration-200 cursor-pointer ${
-                        isSelected ? "ring-4 ring-primary ring-inset" : ""
-                      }`}
-                      style={{ backgroundColor: slot.color }}
-                      onClick={() => handlePaletteClick(idx)}
-                    >
-                      <div className="absolute inset-0 flex flex-col justify-center items-center gap-3 text-center">
+                {/* Sticky color bar (always visible) */}
+                <div className="sticky top-0 z-10 flex h-20 gap-0 overflow-hidden shadow-md bg-background border-b border-border">
+                  {colorSlots.map((slot, idx) => {
+                    const isSelected = idx === selected;
+                    const textColor = contrastColor(slot.color);
+                    return (
+                      <button
+                        type="button"
+                        key={idx}
+                        className={`relative flex-1 min-w-[120px] h-20 transition-all duration-200 cursor-pointer focus:outline-none ${
+                          isSelected ? "ring-4 ring-primary ring-inset" : ""
+                        }`}
+                        style={{ backgroundColor: slot.color }}
+                        onClick={() => handlePaletteClick(idx)}
+                        title={slot.color}
+                      >
                         <div
-                          className="text-lg font-semibold font-mono px-3 py-1 rounded-full bg-black/20 backdrop-blur-sm"
+                          className="absolute inset-0 flex items-center justify-center"
                           style={{ color: textColor }}
                         >
-                          {slot.color}
+                          <span className="text-xs sm:text-sm font-semibold font-mono px-2 py-1 rounded-full bg-black/20 backdrop-blur-sm">
+                            {slot.color}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
+                        {slot.locked && (
+                          <div
+                            className="absolute top-2 right-2 rounded-full p-1.5 bg-black/30 backdrop-blur-sm"
+                            style={{ color: textColor }}
+                          >
+                            <Lock className="w-4 h-4" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Main palette canvas (fills remaining space) */}
+                <div className="flex-1 flex overflow-hidden">
+                  {colorSlots.map((slot, idx) => {
+                    const isSelected = idx === selected;
+                    const textColor = contrastColor(slot.color);
+                    return (
+                      <div
+                        key={`canvas-${idx}`}
+                        className={`relative flex-1 min-w-[160px] transition-all duration-200 cursor-pointer ${
+                          isSelected ? "ring-4 ring-primary ring-inset" : ""
+                        }`}
+                        style={{ backgroundColor: slot.color }}
+                        onClick={() => handlePaletteClick(idx)}
+                      >
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-4">
+                          <div
+                            className="text-2xl sm:text-3xl font-semibold font-mono px-4 py-2 rounded-full bg-black/20 backdrop-blur-sm"
+                            style={{ color: textColor }}
+                          >
+                            {slot.color}
+                          </div>
                           <Button
                             size="sm"
                             variant="secondary"
@@ -1026,23 +1074,23 @@ export function ProPaletteBuilder({
                               toast.success(`Copied ${slot.color}`, { position: TOAST_POSITION });
                             }}
                           >
-                            <Copy className="w-4 h-4 mr-1" />
+                            <Copy className="w-4 h-4 mr-2" />
                             Copy
                           </Button>
                         </div>
+
+                        {slot.locked && (
+                          <div
+                            className="absolute top-4 right-4 rounded-full p-2 bg-black/30 backdrop-blur-sm"
+                            style={{ color: textColor }}
+                          >
+                            <Lock className="w-5 h-5" />
+                          </div>
+                        )}
                       </div>
-                      {slot.locked && (
-                        <div
-                          className="absolute top-4 right-4 rounded-full px-3 py-1 text-xs font-medium bg-black/30 backdrop-blur-sm"
-                          style={{ color: textColor }}
-                        >
-                          <Lock className="w-4 h-4" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
               </div>
               {isDesktop && isChatOpen && (
                 <aside className="w-80 border-l border-border bg-card/70 backdrop-blur">
@@ -1052,7 +1100,7 @@ export function ProPaletteBuilder({
             </div>
 
             <footer className="border-t border-border bg-card/80 backdrop-blur px-4 py-3">
-              <div className="flex flex-wrap gap-2 items-center">
+              <div className="flex items-center gap-2 overflow-x-auto flex-nowrap">
                 <Button
                   variant="outline"
                   size="sm"
@@ -1105,11 +1153,12 @@ export function ProPaletteBuilder({
                   Save
                 </Button>
                 <div className="ml-auto flex gap-2">
-                  <Button onClick={regenerate}>
+                  <Button size="sm" onClick={regenerate}>
                     <RefreshCw className="w-4 h-4 mr-2" />
                     Regenerate (Space)
                   </Button>
                   <Button
+                    size="sm"
                     variant="secondary"
                     onClick={harmonizePalette}
                   >
