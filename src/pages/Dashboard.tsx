@@ -9,6 +9,7 @@ import { ProPaletteBuilder } from "@/components/ProPaletteBuilder";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { UsageContent } from "@/components/UsageContent";
 import { PlanContent } from "@/components/PlanContent";
+import { getPlanLimits } from "@/lib/planLimits";
 import { toast } from "sonner";
 
 type DashboardView = "home" | "my-palettes" | "explore" | "generator" | "generator-old" | "usage" | "plan";
@@ -37,6 +38,7 @@ const Dashboard = () => {
   const [lastGeneration, setLastGeneration] = useState<string | null>(null);
   const [userPalettes, setUserPalettes] = useState<SavedPalette[]>([]);
   const [loadingPalettes, setLoadingPalettes] = useState(false);
+  const [chatUsageCount, setChatUsageCount] = useState(0);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -75,8 +77,8 @@ const Dashboard = () => {
           .eq("user_id", userId)
           .single(),
         supabase
-          .from("user_ai_generations")
-          .select("generation_count, last_generation_at")
+          .from("user_ai_usage")
+          .select("palette_generations_count, last_generation_at, chat_messages_count")
           .eq("user_id", userId)
           .single(),
       ]);
@@ -88,8 +90,9 @@ const Dashboard = () => {
       });
 
       if (genResult.data) {
-        setGenerationCount(genResult.data.generation_count);
+        setGenerationCount(genResult.data.palette_generations_count || 0);
         setLastGeneration(genResult.data.last_generation_at);
+        setChatUsageCount(genResult.data.chat_messages_count || 0);
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -274,6 +277,42 @@ const Dashboard = () => {
                 </p>
               </button>
             </div>
+
+            {/* Usage Stats */}
+            {profile && (
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-4">Your Usage This Month</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="bg-card border border-border rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">AI Palettes Generated</span>
+                      <Palette className="h-5 w-5 text-primary" />
+                    </div>
+                    <p className="text-3xl font-bold">
+                      {generationCount} <span className="text-lg font-normal text-muted-foreground">/ {getPlanLimits(profile.plan).palettesPerMonth}</span>
+                    </p>
+                    {generationCount >= getPlanLimits(profile.plan).palettesPerMonth && (
+                      <p className="text-xs text-amber-500 mt-2">Limit reached - Upgrade for more!</p>
+                    )}
+                  </div>
+                  <div className="bg-card border border-border rounded-xl p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">Ask Mode Chat Messages</span>
+                      <Home className="h-5 w-5 text-accent" />
+                    </div>
+                    <p className="text-3xl font-bold">
+                      {chatUsageCount} <span className="text-lg font-normal text-muted-foreground">/ {getPlanLimits(profile.plan).chatMessagesPerMonth}</span>
+                    </p>
+                    {chatUsageCount >= getPlanLimits(profile.plan).chatMessagesPerMonth && getPlanLimits(profile.plan).chatMessagesPerMonth > 0 && (
+                      <p className="text-xs text-amber-500 mt-2">Limit reached - Upgrade for more!</p>
+                    )}
+                    {getPlanLimits(profile.plan).chatMessagesPerMonth === 0 && (
+                      <p className="text-xs text-muted-foreground mt-2">Upgrade to Pro to use Ask Mode</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

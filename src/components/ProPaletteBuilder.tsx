@@ -20,10 +20,12 @@ import {
   Droplets,
   Layers,
   Image,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getRandomPalette, generateRandomColors, getFreePalettes, type Palette } from "@/data/palettes";
 import { supabase } from "@/integrations/supabase/client";
+import { getPlanLimits } from "@/lib/planLimits";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import {
@@ -148,6 +150,12 @@ export function ProPaletteBuilder({
   const [editScope, setEditScope] = useState<EditScope>("selected");
   const [chatInput, setChatInput] = useState<string>("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  
+  // Chat functionality states
+  const [chatLimit, setChatLimit] = useState<number>(0);
+  const [chatUsed, setChatUsed] = useState<number>(0);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const [userPlan, setUserPlan] = useState<string>("free");
 
   // Get palettes for sidebar
   const allPalettes = useMemo(() => getFreePalettes().slice(0, 100), []);
@@ -171,6 +179,58 @@ export function ProPaletteBuilder({
     };
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  // Fetch user's plan and usage limits on mount
+  useEffect(() => {
+    const fetchUsageAndHistory = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) return;
+
+      // Get user's plan
+      const { data: sub } = await supabase
+        .from('user_subscriptions')
+        .select('plan, is_active')
+        .eq('user_id', session.user.id)
+        .single();
+      
+      const plan = (sub?.is_active && sub?.plan) || 'free';
+      setUserPlan(plan);
+      
+      const planLimits = getPlanLimits(plan);
+      setChatLimit(planLimits.chatMessagesPerMonth);
+      
+      // Get usage count
+      const { data: usage } = await supabase
+        .from('user_ai_usage')
+        .select('chat_messages_count')
+        .eq('user_id', session.user.id)
+        .single();
+      
+      setChatUsed(usage?.chat_messages_count || 0);
+
+      // Load chat history if enabled
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('save_chat_history')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (settings?.save_chat_history) {
+        const { data: history } = await supabase
+          .from('user_chat_history')
+          .select('role, content')
+          .eq('user_id', session.user.id)
+          .order('created_at', { ascending: true })
+          .limit(20);
+
+        if (history && history.length > 0) {
+          setChatMessages(history as ChatMessage[]);
+        }
+      }
+    };
+
+    fetchUsageAndHistory();
   }, []);
 
   const selectedSlot = colorSlots[selected] ?? colorSlots[0];
@@ -384,19 +444,71 @@ export function ProPaletteBuilder({
     toast.success(`Applied "${palette.name}"`, { duration: 1500, position: TOAST_POSITION });
   }, []);
 
-  const handleAskSubmit = useCallback(() => {
+  const handleAskSubmit = useCallback(async () => {
     if (!chatInput.trim()) return;
     
-    const userMessage: ChatMessage = { role: "user", content: chatInput };
-    const randomTip = COLOR_TIPS[Math.floor(Math.random() * COLOR_TIPS.length)];
-    const assistantMessage: ChatMessage = { 
-      role: "assistant", 
-      content: `Great question! Here's a tip: ${randomTip}` 
-    };
+    // Check if user has access to Ask Mode
+    const planLimits = getPlanLimits(userPlan);
+    if (!planLimits.features.askMode) {
+      toast.error("You need a Pro plan or higher to use Ask Mode", { position: TOAST_POSITION });
+      return;
+    }
     
-    setChatMessages(prev => [...prev, userMessage, assistantMessage]);
+    // Check if user has reached limit
+    if (chatUsed >= chatLimit) {
+      toast.error("You've reached your monthly Ask Mode limit. Upgrade your plan.", { position: TOAST_POSITION });
+      return;
+    }
+    
+    setIsLoadingChat(true);
+    
+    const userMessage: ChatMessage = { role: "user", content: chatInput };
+    setChatMessages(prev => [...prev, userMessage]);
     setChatInput("");
-  }, [chatInput]);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Please sign in to use Ask Mode", { position: TOAST_POSITION });
+        setIsLoadingChat(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('ask-chat', {
+        body: {
+          question: chatInput,
+          paletteContext: colorSlots.map(s => s.color)
+        }
+      });
+      
+      if (error) {
+        console.error('Ask Mode error:', error);
+        toast.error(error.message || "Failed to get response", { position: TOAST_POSITION });
+        // Remove the user message we added optimistically
+        setChatMessages(prev => prev.slice(0, -1));
+      } else {
+        const assistantMessage: ChatMessage = { 
+          role: "assistant", 
+          content: data.response 
+        };
+        setChatMessages(prev => [...prev, assistantMessage]);
+        setChatUsed(data.usage?.used || chatUsed + 1);
+        
+        // Show remaining messages
+        const remaining = chatLimit - (data.usage?.used || chatUsed + 1);
+        if (remaining <= 5 && remaining > 0) {
+          toast.info(`${remaining} chat messages remaining this month`, { position: TOAST_POSITION });
+        }
+      }
+    } catch (err) {
+      console.error('Ask Mode error:', err);
+      toast.error("Failed to get response. Please try again.", { position: TOAST_POSITION });
+      // Remove the user message we added optimistically
+      setChatMessages(prev => prev.slice(0, -1));
+    } finally {
+      setIsLoadingChat(false);
+    }
+  }, [chatInput, colorSlots, userPlan, chatUsed, chatLimit]);
 
   // FIX: Only copy color when C is pressed WITHOUT Ctrl/Cmd
   useEffect(() => {
@@ -595,39 +707,58 @@ export function ProPaletteBuilder({
             <div className="space-y-3">
               {chatMessages.length === 0 ? (
                 <div className="rounded-xl border border-border bg-muted/50 p-4 text-sm text-muted-foreground space-y-2">
-                  <p>Ask me anything about color theory!</p>
-                  <p className="text-xs">Try: "What are complementary colors?"</p>
+                  <p>Ask me anything about Colored In or color theory!</p>
+                  <p className="text-xs">Examples: "What features are in the Pro plan?", "How do I harmonize colors?", "What makes a good color palette?"</p>
+                  {chatLimit > 0 && (
+                    <p className="text-xs font-medium text-foreground pt-2">
+                      {chatUsed} / {chatLimit} messages used this month
+                    </p>
+                  )}
                 </div>
               ) : (
-                chatMessages.map((msg, i) => (
-                  <div 
-                    key={i} 
-                    className={`rounded-xl p-3 text-sm ${
-                      msg.role === "user" 
-                        ? "bg-primary text-primary-foreground ml-8" 
-                        : "bg-muted text-foreground mr-8"
-                    }`}
-                  >
-                    {msg.content}
-                  </div>
-                ))
+                <>
+                  {chatMessages.map((msg, i) => (
+                    <div 
+                      key={i} 
+                      className={`rounded-xl p-3 text-sm ${
+                        msg.role === "user" 
+                          ? "bg-primary text-primary-foreground ml-8" 
+                          : "bg-muted text-foreground mr-8"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  ))}
+                  {isLoadingChat && (
+                    <div className="rounded-xl p-3 text-sm bg-muted text-foreground mr-8 flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Thinking...
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </ScrollArea>
+          {chatLimit > 0 && chatMessages.length > 0 && (
+            <p className="text-xs text-muted-foreground mb-2 text-center">
+              {chatUsed} / {chatLimit} messages used
+            </p>
+          )}
           <div className="flex gap-2">
             <Input 
               placeholder="Ask a question..."
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !isLoadingChat) {
                   e.preventDefault();
                   handleAskSubmit();
                 }
               }}
+              disabled={isLoadingChat}
             />
-            <Button size="icon" onClick={handleAskSubmit}>
-              <Send className="w-4 h-4" />
+            <Button size="icon" onClick={handleAskSubmit} disabled={isLoadingChat || !chatInput.trim()}>
+              {isLoadingChat ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </Button>
           </div>
         </TabsContent>

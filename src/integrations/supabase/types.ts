@@ -62,27 +62,90 @@ export type Database = {
         }
         Relationships: []
       }
-      user_ai_generations: {
+      user_ai_usage: {
         Row: {
           created_at: string
-          generation_count: number
+          palette_generations_count: number
+          chat_messages_count: number
           id: string
           last_generation_at: string | null
+          last_chat_at: string | null
+          palette_generations_reset_at: string | null
+          chat_messages_reset_at: string | null
           user_id: string
         }
         Insert: {
           created_at?: string
-          generation_count?: number
+          palette_generations_count?: number
+          chat_messages_count?: number
           id?: string
           last_generation_at?: string | null
+          last_chat_at?: string | null
+          palette_generations_reset_at?: string | null
+          chat_messages_reset_at?: string | null
           user_id: string
         }
         Update: {
           created_at?: string
-          generation_count?: number
+          palette_generations_count?: number
+          chat_messages_count?: number
           id?: string
           last_generation_at?: string | null
+          last_chat_at?: string | null
+          palette_generations_reset_at?: string | null
+          chat_messages_reset_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_chat_history: {
+        Row: {
+          id: string
+          user_id: string
+          role: string
+          content: string
+          palette_context: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role: string
+          content: string
+          palette_context?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role?: string
+          content?: string
+          palette_context?: Json | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          user_id: string
+          save_chat_history: boolean
+          last_activity: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          user_id: string
+          save_chat_history?: boolean
+          last_activity?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          user_id?: string
+          save_chat_history?: boolean
+          last_activity?: string
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

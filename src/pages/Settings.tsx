@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +50,8 @@ const Settings = () => {
   const [isCanceling, setIsCanceling] = useState(false);
   const [isLoadingPortal, setIsLoadingPortal] = useState(false);
   const [isDevUpdatingPlan, setIsDevUpdatingPlan] = useState(false);
+  const [saveChatHistory, setSaveChatHistory] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
 
   useEffect(() => {
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
@@ -69,6 +72,17 @@ const Settings = () => {
       }
 
       await refreshSubscription(session.user.id);
+
+      // Fetch user settings
+      const { data: settings } = await supabase
+        .from("user_settings")
+        .select("save_chat_history")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (settings) {
+        setSaveChatHistory(settings.save_chat_history);
+      }
 
       setLoading(false);
     };
@@ -228,6 +242,54 @@ const Settings = () => {
     }
   };
 
+  const handleToggleChatHistory = async (checked: boolean) => {
+    if (!user?.id) return;
+
+    setIsLoadingSettings(true);
+    try {
+      const { error } = await supabase
+        .from("user_settings")
+        .upsert(
+          {
+            user_id: user.id,
+            save_chat_history: checked,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id" }
+        );
+
+      if (error) throw error;
+
+      setSaveChatHistory(checked);
+      toast.success(checked ? "Chat history will be saved" : "Chat history will not be saved");
+    } catch (error: any) {
+      console.error("Error updating settings:", error);
+      toast.error("Failed to update settings");
+    } finally {
+      setIsLoadingSettings(false);
+    }
+  };
+
+  const handlePasswordResetEmail = async () => {
+    if (!user?.email) {
+      toast.error("No email found");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password reset email sent! Check your inbox.");
+    } catch (error: any) {
+      console.error("Error sending reset email:", error);
+      toast.error(error.message || "Failed to send reset email");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -315,7 +377,43 @@ const Settings = () => {
               <Button type="submit" disabled={isUpdating || !newPassword || !confirmPassword}>
                 {isUpdating ? "Updating..." : "Update Password"}
               </Button>
+              
+              <div className="pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Or reset your password via email
+                </p>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={handlePasswordResetEmail}
+                >
+                  Send Password Reset Email
+                </Button>
+              </div>
             </form>
+          </div>
+        </div>
+
+        {/* User Settings */}
+        <div className="mt-6 bg-card border border-border rounded-xl p-6">
+          <h3 className="font-medium mb-4">Preferences</h3>
+          
+          {/* Chat History Toggle */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="chat-history">Save Ask Mode Chat History</Label>
+                <p className="text-sm text-muted-foreground">
+                  When enabled, your Ask Mode conversations will be saved and restored when you return.
+                </p>
+              </div>
+              <Switch
+                id="chat-history"
+                checked={saveChatHistory}
+                onCheckedChange={handleToggleChatHistory}
+                disabled={isLoadingSettings}
+              />
+            </div>
           </div>
         </div>
 
