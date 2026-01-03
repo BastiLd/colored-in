@@ -171,6 +171,7 @@ export function ProPaletteBuilder({
   const [chatUsed, setChatUsed] = useState<number>(0);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [userPlan, setUserPlan] = useState<string>("free");
+  const [userId, setUserId] = useState<string | null>(null);
 
   // Save modal states
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -227,6 +228,7 @@ export function ProPaletteBuilder({
     const fetchUsageAndHistory = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
+      setUserId(session.user.id);
 
       // Get user's plan
       const { data: sub } = await supabase
@@ -756,7 +758,13 @@ export function ProPaletteBuilder({
             </div>
           )}
           {sidebarTab === "assets" && (
-            <AssetsPanel />
+            userId ? (
+              <AssetsPanel userId={userId} userPlan={userPlan} />
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Sign in to manage assets.
+              </div>
+            )
           )}
         </div>
       </ScrollArea>
