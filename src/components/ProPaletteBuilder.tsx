@@ -30,6 +30,12 @@ import { AssetsPanel } from "@/components/AssetsPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import {
+  Panel,
+  PanelGroup,
+  PanelResizeHandle,
+  type ImperativePanelHandle,
+} from "react-resizable-panels";
+import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -172,6 +178,7 @@ export function ProPaletteBuilder({
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [userId, setUserId] = useState<string | null>(null);
+  const chatPanelRef = useRef<ImperativePanelHandle>(null);
 
   // Save modal states
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -222,6 +229,16 @@ export function ProPaletteBuilder({
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
   }, []);
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    if (!chatPanelRef.current) return;
+    if (isChatOpen) {
+      chatPanelRef.current.expand();
+    } else {
+      chatPanelRef.current.collapse();
+    }
+  }, [isChatOpen, isDesktop]);
 
   // Fetch user's plan and usage limits on mount
   useEffect(() => {
@@ -956,12 +973,18 @@ export function ProPaletteBuilder({
         </div>
       </header>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[260px_1fr_auto] overflow-hidden">
-        <div className="hidden lg:block border-r border-border bg-card">
-          {sidebarContent}
-        </div>
-
-        <div className="relative flex flex-col overflow-hidden">
+      {isDesktop ? (
+        <PanelGroup direction="horizontal" className="flex-1 overflow-hidden">
+          <Panel
+            defaultSize={22}
+            minSize={16}
+            maxSize={35}
+            className="border-r border-border bg-card"
+          >
+            {sidebarContent}
+          </Panel>
+          <PanelResizeHandle className="w-2 bg-border/30 hover:bg-border cursor-col-resize" />
+          <Panel defaultSize={53} minSize={35} className="relative flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/70 backdrop-blur">
             <div className="flex items-center gap-2">
               {!isDesktop && (
@@ -1104,11 +1127,6 @@ export function ProPaletteBuilder({
                   })}
                 </div>
               </div>
-              {isDesktop && isChatOpen && (
-                <aside className="w-80 border-l border-border bg-card/70 backdrop-blur">
-                  {chatContent}
-                </aside>
-              )}
             </div>
 
             <footer className="sticky bottom-0 z-10 border-t border-border bg-card/90 backdrop-blur px-4 py-3">
@@ -1181,9 +1199,231 @@ export function ProPaletteBuilder({
               </div>
             </footer>
           </div>
-        </div>
+          </Panel>
+          <PanelResizeHandle className="w-2 bg-border/30 hover:bg-border cursor-col-resize" />
+          <Panel
+            ref={chatPanelRef}
+            defaultSize={25}
+            minSize={18}
+            maxSize={40}
+            collapsible
+            collapsedSize={0}
+            className="border-l border-border bg-card/70 backdrop-blur"
+          >
+            {chatContent}
+          </Panel>
+        </PanelGroup>
+      ) : (
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[260px_1fr_auto] overflow-hidden">
+          <div className="hidden lg:block border-r border-border bg-card">
+            {sidebarContent}
+          </div>
 
-      </div>
+          <div className="relative flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-card/70 backdrop-blur">
+              <div className="flex items-center gap-2">
+                {!isDesktop && (
+                  <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <PanelLeftOpen className="w-4 h-4" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="p-0 w-80">
+                      <SheetHeader className="p-4 border-b border-border">
+                        <SheetTitle>Tools</SheetTitle>
+                      </SheetHeader>
+                      {sidebarContent}
+                    </SheetContent>
+                  </Sheet>
+                )}
+                <div>
+                  <p className="text-sm font-semibold">Palette</p>
+                  <p className="text-xs text-muted-foreground">
+                    Click to select, hover to copy
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {!isDesktop && (
+                  <Sheet open={isChatOpen} onOpenChange={setIsChatOpen}>
+                    <SheetTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <MessageCircle className="w-4 h-4" />
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="right" className="p-0 w-96">
+                      {chatContent}
+                    </SheetContent>
+                  </Sheet>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 flex">
+                <div className="flex-1 flex flex-col">
+                  {/* Sticky color bar (always visible) */}
+                  <div className="sticky top-0 z-10 flex h-20 gap-0 overflow-hidden shadow-md bg-background border-b border-border">
+                    {colorSlots.map((slot, idx) => {
+                      const isSelected = idx === selected;
+                      const textColor = contrastColor(slot.color);
+                      return (
+                        <button
+                          type="button"
+                          key={idx}
+                          className={`relative flex-1 min-w-[120px] h-20 transition-all duration-200 cursor-pointer focus:outline-none ${
+                            isSelected ? "ring-4 ring-primary ring-inset" : ""
+                          }`}
+                          style={{ backgroundColor: slot.color }}
+                          onClick={() => handlePaletteClick(idx)}
+                          title={slot.color}
+                        >
+                          <div
+                            className="absolute inset-0 flex items-center justify-center"
+                            style={{ color: textColor }}
+                          >
+                            <span className="text-xs sm:text-sm font-semibold font-mono px-2 py-1 rounded-full bg-black/20 backdrop-blur-sm">
+                              {slot.color}
+                            </span>
+                          </div>
+                          {slot.locked && (
+                            <div
+                              className="absolute top-2 right-2 rounded-full p-1.5 bg-black/30 backdrop-blur-sm"
+                              style={{ color: textColor }}
+                            >
+                              <Lock className="w-4 h-4" />
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Main palette canvas (fills remaining space) */}
+                  <div className="flex-1 flex overflow-hidden">
+                    {colorSlots.map((slot, idx) => {
+                      const isSelected = idx === selected;
+                      const textColor = contrastColor(slot.color);
+                      return (
+                        <div
+                          key={`canvas-${idx}`}
+                          className={`relative flex-1 min-w-[160px] transition-all duration-200 cursor-pointer ${
+                            isSelected ? "ring-4 ring-primary ring-inset" : ""
+                          }`}
+                          style={{ backgroundColor: slot.color }}
+                          onClick={() => handlePaletteClick(idx)}
+                        >
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center px-4">
+                            <div
+                              className="text-2xl sm:text-3xl font-semibold font-mono px-4 py-2 rounded-full bg-black/20 backdrop-blur-sm"
+                              style={{ color: textColor }}
+                            >
+                              {slot.color}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="bg-black/25 text-white border-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(slot.color);
+                                toast.success(`Copied ${slot.color}`, { position: TOAST_POSITION });
+                              }}
+                            >
+                              <Copy className="w-4 h-4 mr-2" />
+                              Copy
+                            </Button>
+                          </div>
+
+                          {slot.locked && (
+                            <div
+                              className="absolute top-4 right-4 rounded-full p-2 bg-black/30 backdrop-blur-sm"
+                              style={{ color: textColor }}
+                            >
+                              <Lock className="w-5 h-5" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <footer className="sticky bottom-0 z-10 border-t border-border bg-card/90 backdrop-blur px-4 py-3">
+                <div className="flex items-center gap-2 overflow-x-auto flex-nowrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => moveSlot(-1)}
+                    disabled={selected <= 0}
+                  >
+                    <MoveLeft className="w-4 h-4 mr-2" />
+                    Move left
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => moveSlot(1)}
+                    disabled={selected >= colorSlots.length - 1}
+                  >
+                    <MoveRight className="w-4 h-4 mr-2" />
+                    Move right
+                  </Button>
+                  <Button
+                    variant={selectedSlot?.locked ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={toggleLock}
+                  >
+                    {selectedSlot?.locked ? (
+                      <>
+                        <Unlock className="w-4 h-4 mr-2" />
+                        Unlock
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="w-4 h-4 mr-2" />
+                        Lock
+                      </>
+                    )}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={copyColor}>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy color (C)
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={copyPalette}>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy JSON
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={copyPaletteCsv}>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy CSV
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={savePalette}>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save
+                  </Button>
+                  <div className="ml-auto flex gap-2">
+                    <Button size="sm" onClick={regenerate}>
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Regenerate (Space)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={harmonizePalette}
+                    >
+                      <ArrowLeftRight className="w-4 h-4 mr-2" />
+                      Harmonize
+                    </Button>
+                  </div>
+                </div>
+              </footer>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     
     {/* Save Palette Modal */}
