@@ -1,8 +1,13 @@
 project_id = "gevqwporirhaekapftib"
 
 [functions.generate-palette]
-# SECURITY: JWT verification is required for production to prevent unauthorized access
-verify_jwt = true
+# Auth is verified manually inside the function using the Authorization header.
+# Keeping verify_jwt disabled prevents 401s at the Edge gateway while still enforcing auth in code.
+verify_jwt = false
+
+[functions.ask-chat]
+# Auth is verified manually inside the function using the Authorization header.
+verify_jwt = false
 
 [functions.create-checkout]
 # JWT verification is handled manually in the function code (see create-checkout/index.ts)
