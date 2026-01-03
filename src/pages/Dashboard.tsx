@@ -392,7 +392,11 @@ const Dashboard = () => {
         )}
 
         {currentView === "usage" && (
-          <UsageContent profile={profile} generationCount={generationCount} />
+          <UsageContent
+            profile={profile}
+            generationCount={generationCount}
+            chatUsageCount={chatUsageCount}
+          />
         )}
 
         {currentView === "plan" && (
