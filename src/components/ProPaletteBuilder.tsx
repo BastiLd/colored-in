@@ -776,7 +776,16 @@ export function ProPaletteBuilder({
           )}
           {sidebarTab === "assets" && (
             userId ? (
-              <AssetsPanel userId={userId} userPlan={userPlan} />
+              <AssetsPanel 
+                userId={userId} 
+                userPlan={userPlan} 
+                onPaletteGenerated={(colors, name) => {
+                  setColorSlots(colors.map(c => ({ color: c, locked: false })));
+                  toast.success(`Applied palette "${name}" from asset analysis`, { 
+                    position: TOAST_POSITION 
+                  });
+                }}
+              />
             ) : (
               <div className="text-sm text-muted-foreground">
                 Sign in to manage assets.
