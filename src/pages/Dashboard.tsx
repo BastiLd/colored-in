@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Home, Compass, Palette, Copy, Trash2 } from "lucide-react";
+import { Home, Compass, Palette, Copy, Trash2, Sparkles } from "lucide-react";
 import { PaletteBrowser } from "@/components/PaletteBrowser";
 import { PaletteGenerator } from "@/components/PaletteGenerator";
 import { ProPaletteBuilder } from "@/components/ProPaletteBuilder";
 import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { UsageContent } from "@/components/UsageContent";
 import { PlanContent } from "@/components/PlanContent";
+import { AIPaletteGenerator } from "@/components/AIPaletteGenerator";
 import { getPlanLimits } from "@/lib/planLimits";
 import { toast } from "sonner";
 
@@ -39,6 +40,7 @@ const Dashboard = () => {
   const [userPalettes, setUserPalettes] = useState<SavedPalette[]>([]);
   const [loadingPalettes, setLoadingPalettes] = useState(false);
   const [chatUsageCount, setChatUsageCount] = useState(0);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -237,7 +239,7 @@ const Dashboard = () => {
             </div>
 
             {/* Quick Actions */}
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               <button
                 onClick={() => setCurrentView("generator")}
                 className="p-6 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors text-left group"
@@ -245,9 +247,22 @@ const Dashboard = () => {
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                   <Palette className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-semibold mb-2">Generate Palette</h3>
+                <h3 className="font-semibold mb-2">Manual Builder</h3>
                 <p className="text-sm text-muted-foreground">
-                  Create a new color palette from scratch or with AI assistance.
+                  Create a new color palette manually from scratch.
+                </p>
+              </button>
+
+              <button
+                onClick={() => setShowAIGenerator(true)}
+                className="p-6 bg-card border border-border rounded-xl hover:border-accent/50 transition-colors text-left group"
+              >
+                <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
+                  <Sparkles className="h-6 w-6 text-accent" />
+                </div>
+                <h3 className="font-semibold mb-2">KI-Paletten-Generator</h3>
+                <p className="text-sm text-muted-foreground">
+                  Generate beautiful palettes with AI assistance.
                 </p>
               </button>
 
@@ -255,8 +270,8 @@ const Dashboard = () => {
                 onClick={() => setCurrentView("explore")}
                 className="p-6 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors text-left group"
               >
-                <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
-                  <Compass className="h-6 w-6 text-accent" />
+                <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
+                  <Compass className="h-6 w-6 text-purple-500" />
                 </div>
                 <h3 className="font-semibold mb-2">Explore Palettes</h3>
                 <p className="text-sm text-muted-foreground">
@@ -407,6 +422,12 @@ const Dashboard = () => {
           />
         )}
       </main>
+
+      {/* AI Palette Generator Modal */}
+      <AIPaletteGenerator 
+        isOpen={showAIGenerator} 
+        onClose={() => setShowAIGenerator(false)} 
+      />
     </div>
   );
 };
