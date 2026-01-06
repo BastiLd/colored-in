@@ -204,39 +204,52 @@ const Settings = () => {
   };
 
   const handleCancelSubscription = async () => {
-    if (!subscription?.stripe_subscription_id) {
-      toast.error("No active subscription to cancel.");
-      return;
-    }
-
-    if (subscription.plan === "free") {
+    if (subscription?.plan === "free") {
       toast.error("You are on the free plan.");
       return;
     }
 
     setIsCanceling(true);
     try {
-      const { data, error } = await supabase.functions.invoke('cancel-subscription');
+      // If there's a real Stripe subscription, cancel it via the Edge Function
+      if (subscription?.stripe_subscription_id) {
+        const { data, error } = await supabase.functions.invoke('cancel-subscription');
 
-      if (error) {
-        console.error("Cancel subscription error:", error);
-        throw new Error(error.message || "Failed to cancel subscription");
-      }
+        if (error) {
+          console.error("Cancel subscription error:", error);
+          throw new Error(error.message || "Failed to cancel subscription");
+        }
 
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+        if (data?.error) {
+          throw new Error(data.error);
+        }
 
-      // Show success message with cancellation date
-      const cancelDate = data?.cancel_at 
-        ? new Date(data.cancel_at).toLocaleDateString("de-DE", {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
+        // Show success message with cancellation date
+        const cancelDate = data?.cancel_at 
+          ? new Date(data.cancel_at).toLocaleDateString("de-DE", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })
+          : "the end of your billing period";
+
+        toast.success(`Subscription will be canceled on ${cancelDate}. You'll keep all benefits until then.`);
+      } else {
+        // No Stripe subscription (admin-set plan) - just reset to free
+        const { error } = await supabase
+          .from("user_subscriptions")
+          .update({
+            plan: "free",
+            is_active: true,
+            expires_at: null,
+            updated_at: new Date().toISOString(),
           })
-        : "the end of your billing period";
+          .eq("user_id", user?.id);
 
-      toast.success(`Subscription will be canceled on ${cancelDate}. You'll keep all benefits until then.`);
+        if (error) throw error;
+
+        toast.success("Plan has been reset to Free.");
+      }
       
       // Refresh subscription data
       if (user?.id) {
@@ -557,27 +570,30 @@ const Settings = () => {
               </div>
             )}
 
-            {/* Billing Management */}
-            {subscription?.stripe_customer_id && subscription?.plan !== "free" && (
+            {/* Billing Management & Cancel */}
+            {subscription?.is_active && subscription?.plan !== "free" && (
               <div className="flex flex-wrap gap-3 pt-3 border-t border-border">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleManageBilling}
-                  disabled={isLoadingPortal}
-                >
-                  {isLoadingPortal ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Loading...
-                    </>
-                  ) : (
-                    <>
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Manage Billing
-                    </>
-                  )}
-                </Button>
+                {/* Only show Manage Billing if there's a real Stripe customer */}
+                {subscription?.stripe_customer_id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleManageBilling}
+                    disabled={isLoadingPortal}
+                  >
+                    {isLoadingPortal ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        Manage Billing
+                      </>
+                    )}
+                  </Button>
+                )}
 
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -587,29 +603,39 @@ const Settings = () => {
                       className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
                       disabled={isCanceling}
                     >
-                      Cancel Subscription
+                      {subscription?.stripe_subscription_id ? "Cancel Subscription" : "Reset to Free"}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Cancel Subscription?</AlertDialogTitle>
+                      <AlertDialogTitle>
+                        {subscription?.stripe_subscription_id ? "Cancel Subscription?" : "Reset to Free Plan?"}
+                      </AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to cancel your subscription? You'll lose access to:
-                        <ul className="list-disc list-inside mt-2 space-y-1">
-                          <li>Premium palette browsing</li>
-                          <li>AI generation credits</li>
-                          <li>Advanced features</li>
-                        </ul>
-                        Your subscription will remain active until {subscription?.expires_at ? new Date(subscription.expires_at).toLocaleDateString() : "the end of your billing period"}.
+                        {subscription?.stripe_subscription_id ? (
+                          <>
+                            Are you sure you want to cancel your subscription? You'll lose access to:
+                            <ul className="list-disc list-inside mt-2 space-y-1">
+                              <li>Premium palette browsing</li>
+                              <li>AI generation credits</li>
+                              <li>Advanced features</li>
+                            </ul>
+                            Your subscription will remain active until {subscription?.expires_at ? new Date(subscription.expires_at).toLocaleDateString() : "the end of your billing period"}.
+                          </>
+                        ) : (
+                          <>
+                            This will reset your plan back to Free. You'll lose access to all premium features immediately.
+                          </>
+                        )}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Keep Subscription</AlertDialogCancel>
+                      <AlertDialogCancel>Keep Plan</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleCancelSubscription}
                         className="bg-red-500 hover:bg-red-600"
                       >
-                        {isCanceling ? "Canceling..." : "Yes, Cancel"}
+                        {isCanceling ? "Processing..." : (subscription?.stripe_subscription_id ? "Yes, Cancel" : "Yes, Reset to Free")}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
