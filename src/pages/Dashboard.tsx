@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { Home, Compass, Palette, Copy, Trash2, Sparkles } from "lucide-react";
+import { Home, Compass, Palette, Copy, Trash2, Sparkles, Upload, Link as LinkIcon, ExternalLink, Loader2, Image } from "lucide-react";
 import { PaletteBrowser } from "@/components/PaletteBrowser";
 import { PaletteGenerator } from "@/components/PaletteGenerator";
 import { ProPaletteBuilder } from "@/components/ProPaletteBuilder";
@@ -13,7 +13,7 @@ import { AIPaletteGenerator } from "@/components/AIPaletteGenerator";
 import { getPlanLimits } from "@/lib/planLimits";
 import { toast } from "sonner";
 
-type DashboardView = "home" | "my-palettes" | "explore" | "generator" | "generator-old" | "usage" | "plan";
+type DashboardView = "home" | "my-palettes" | "uploads" | "explore" | "generator" | "generator-old" | "usage" | "plan";
 
 interface UserProfile {
   email: string | null;
@@ -29,6 +29,14 @@ interface SavedPalette {
   created_at: string;
 }
 
+interface UserAsset {
+  id: string;
+  type: "image" | "link";
+  url: string;
+  filename: string | null;
+  created_at: string;
+}
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -41,6 +49,8 @@ const Dashboard = () => {
   const [loadingPalettes, setLoadingPalettes] = useState(false);
   const [chatUsageCount, setChatUsageCount] = useState(0);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
+  const [userAssets, setUserAssets] = useState<UserAsset[]>([]);
+  const [loadingAssets, setLoadingAssets] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -109,6 +119,52 @@ const Dashboard = () => {
     setCurrentView(view as DashboardView);
     if (view === "my-palettes" && user) {
       fetchUserPalettes(user.id);
+    }
+    if (view === "uploads" && user) {
+      fetchUserAssets(user.id);
+    }
+  };
+
+  const fetchUserAssets = async (userId: string) => {
+    setLoadingAssets(true);
+    try {
+      const { data, error } = await supabase
+        .from("user_assets")
+        .select("id, type, url, filename, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setUserAssets((data as UserAsset[]) || []);
+    } catch (error) {
+      console.error("Error fetching user assets:", error);
+      toast.error("Failed to load uploads");
+    } finally {
+      setLoadingAssets(false);
+    }
+  };
+
+  const deleteAsset = async (assetId: string, assetUrl: string, type: string) => {
+    try {
+      // Delete from storage if it's an image
+      if (type === "image") {
+        const path = assetUrl.split("/").slice(-2).join("/");
+        await supabase.storage.from("user-assets").remove([path]);
+      }
+
+      // Delete from database
+      const { error } = await supabase
+        .from("user_assets")
+        .delete()
+        .eq("id", assetId);
+
+      if (error) throw error;
+      
+      setUserAssets(prev => prev.filter(a => a.id !== assetId));
+      toast.success("Upload deleted");
+    } catch (error) {
+      console.error("Error deleting asset:", error);
+      toast.error("Failed to delete upload");
     }
   };
 
@@ -401,6 +457,139 @@ const Dashboard = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {currentView === "uploads" && (
+          <div className="p-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">My Uploads</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Manage your uploaded images and saved links
+                </p>
+              </div>
+            </div>
+
+            {loadingAssets ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : userAssets.length === 0 ? (
+              <div className="bg-card border border-border rounded-xl p-12 text-center">
+                <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-semibold mb-2">No uploads yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload images or add links in the Manual Builder to see them here.
+                </p>
+                <button
+                  onClick={() => setCurrentView("generator")}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  Go to Manual Builder
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {/* Images Section */}
+                {userAssets.filter(a => a.type === "image").length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Image className="h-5 w-5 text-primary" />
+                      Images ({userAssets.filter(a => a.type === "image").length})
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {userAssets.filter(a => a.type === "image").map((asset) => (
+                        <div
+                          key={asset.id}
+                          className="group relative bg-card border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-colors"
+                        >
+                          <div className="aspect-square">
+                            <img 
+                              src={asset.url} 
+                              alt={asset.filename || "Uploaded image"} 
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                            <p className="text-white text-xs text-center px-2 truncate max-w-full">
+                              {asset.filename || "Image"}
+                            </p>
+                            <button
+                              onClick={() => deleteAsset(asset.id, asset.url, asset.type)}
+                              className="px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Delete
+                            </button>
+                          </div>
+                          <div className="p-2 border-t border-border">
+                            <p className="text-xs text-muted-foreground truncate">
+                              {new Date(asset.created_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Links Section */}
+                {userAssets.filter(a => a.type === "link").length > 0 && (
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <LinkIcon className="h-5 w-5 text-accent" />
+                      Links ({userAssets.filter(a => a.type === "link").length})
+                    </h3>
+                    <div className="space-y-2">
+                      {userAssets.filter(a => a.type === "link").map((asset) => {
+                        let displayUrl = asset.url;
+                        try {
+                          const url = new URL(asset.url);
+                          displayUrl = url.hostname;
+                        } catch {
+                          // Keep original if parsing fails
+                        }
+                        
+                        return (
+                          <div
+                            key={asset.id}
+                            className="flex items-center gap-4 p-4 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors"
+                          >
+                            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
+                              <LinkIcon className="w-5 h-5 text-accent" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{displayUrl}</p>
+                              <p className="text-sm text-muted-foreground truncate">{asset.url}</p>
+                            </div>
+                            <p className="text-xs text-muted-foreground flex-shrink-0">
+                              {new Date(asset.created_at).toLocaleDateString()}
+                            </p>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <a
+                                href={asset.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </a>
+                              <button
+                                onClick={() => deleteAsset(asset.id, asset.url, asset.type)}
+                                className="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

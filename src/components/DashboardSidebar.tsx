@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Home, Compass, Palette, Settings, LogOut, ChevronDown, BarChart3, CreditCard } from "lucide-react";
+import { Home, Compass, Palette, Settings, LogOut, ChevronDown, BarChart3, CreditCard, Upload } from "lucide-react";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -76,6 +76,18 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
         >
           <Palette className="h-5 w-5" />
           <span>My Palettes</span>
+        </button>
+
+        <button
+          onClick={() => onViewChange("uploads")}
+          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+            currentView === "uploads"
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
+        >
+          <Upload className="h-5 w-5" />
+          <span>My Uploads</span>
         </button>
 
         <button
