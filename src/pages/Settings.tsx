@@ -209,14 +209,42 @@ const Settings = () => {
       return;
     }
 
+    if (subscription.plan === "free") {
+      toast.error("You are on the free plan.");
+      return;
+    }
+
     setIsCanceling(true);
     try {
-      // In a full implementation, you'd call an Edge Function to cancel the subscription
-      // For now, we'll show an info message
-      toast.info("To cancel your subscription, please contact support or manage it through the billing portal.");
-    } catch (error) {
+      const { data, error } = await supabase.functions.invoke('cancel-subscription');
+
+      if (error) {
+        console.error("Cancel subscription error:", error);
+        throw new Error(error.message || "Failed to cancel subscription");
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      // Show success message with cancellation date
+      const cancelDate = data?.cancel_at 
+        ? new Date(data.cancel_at).toLocaleDateString("de-DE", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+        : "the end of your billing period";
+
+      toast.success(`Subscription will be canceled on ${cancelDate}. You'll keep all benefits until then.`);
+      
+      // Refresh subscription data
+      if (user?.id) {
+        await refreshSubscription(user.id);
+      }
+    } catch (error: any) {
       console.error("Error canceling subscription:", error);
-      toast.error("Failed to cancel subscription.");
+      toast.error(error.message || "Failed to cancel subscription. Please try again.");
     } finally {
       setIsCanceling(false);
     }
