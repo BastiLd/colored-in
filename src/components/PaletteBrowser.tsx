@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { Search, ArrowLeft, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Palette, getPalettesByPlan, searchAllPalettes } from "@/data/palettes";
+import { Palette, getPalettesByPlan, searchAllPalettesAsync } from "@/data/palettes";
 import { Input } from "@/components/ui/input";
 import { PaletteModal } from "./PaletteModal";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,15 +29,6 @@ const PaletteCard = memo(function PaletteCard({
 }) {
   // Local hover state - completely isolated per card instance
   const [hoveredColor, setHoveredColor] = useState<number | null>(null);
-  
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaletteBrowser.tsx:useEffect:mount',message:'PaletteCard mounted',data:{paletteId:palette.id,paletteName:palette.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'D'})}).catch(()=>{});
-    return () => {
-      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaletteBrowser.tsx:useEffect:unmount',message:'PaletteCard unmounted',data:{paletteId:palette.id,paletteName:palette.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'D'})}).catch(()=>{});
-    };
-  }, [palette.id, palette.name]);
-  // #endregion
 
   const copyColor = (e: React.MouseEvent, color: string) => {
     e.stopPropagation();
@@ -45,23 +36,11 @@ const PaletteCard = memo(function PaletteCard({
     toast.success(`Copied ${color}`, { duration: 1500, position: "bottom-center" });
   };
 
-  // #region agent log
-  useEffect(() => {
-    fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaletteBrowser.tsx:useEffect:hoveredColor',message:'hoveredColor state changed',data:{paletteId:palette.id,paletteName:palette.name,newHoveredColor:hoveredColor},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'C'})}).catch(()=>{});
-  }, [hoveredColor, palette.id, palette.name]);
-  // #endregion
-
   const handleMouseEnter = (i: number) => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaletteBrowser.tsx:handleMouseEnter',message:'mouse enter',data:{paletteId:palette.id,paletteName:palette.name,colorIndex:i,isDbPalette:palette.id.includes('-') || palette.name.includes('Custom'),currentHoveredColor:hoveredColor},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     setHoveredColor(i);
   };
 
   const handleMouseLeave = () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'PaletteBrowser.tsx:handleMouseLeave',message:'mouse leave',data:{paletteId:palette.id,paletteName:palette.name,currentHoveredColor:hoveredColor},timestamp:Date.now(),sessionId:'debug-session',runId:'run2',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     setHoveredColor(null);
   };
 
@@ -131,12 +110,15 @@ const PaletteCard = memo(function PaletteCard({
 
 export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedPalette, setSelectedPalette] = useState<Palette | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
   const [userPlan, setUserPlan] = useState<string>("free");
   const [isInitialized, setIsInitialized] = useState(false);
+  const [searchResults, setSearchResults] = useState<Palette[]>([]);
   const loaderRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 50;
   
@@ -149,6 +131,8 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
   const pageRef = useRef(0);
   // Force update trigger
   const [, forceUpdate] = useState(0);
+  // Search abort controller ref
+  const searchAbortRef = useRef<boolean>(false);
 
   // Fetch user plan and load initial batch - runs ONCE
   useEffect(() => {
@@ -235,32 +219,72 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
     return () => observer.disconnect();
   }, [loadMore, hasMore, loading]);
 
-  // STABLE filtered palettes - only recomputes when search changes
-  // Uses refs for data, ensuring palette object references stay stable
+  // Debounce search input - wait 300ms after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Async search effect - runs when debounced query changes
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    const lowerQuery = debouncedQuery.toLowerCase().trim();
+    
+    if (!lowerQuery || lowerQuery.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+    
+    // Abort previous search
+    searchAbortRef.current = true;
+    setSearching(true);
+    
+    // Start new search
+    const currentAbort = { aborted: false };
+    searchAbortRef.current = false;
+    
+    searchAllPalettesAsync(debouncedQuery, (results, done) => {
+      if (currentAbort.aborted) return;
+      setSearchResults(results);
+      if (done) {
+        setSearching(false);
+      }
+    }).catch(() => {
+      if (!currentAbort.aborted) setSearching(false);
+    });
+    
+    return () => {
+      currentAbort.aborted = true;
+    };
+  }, [debouncedQuery, isInitialized]);
+
+  // Compute displayed palettes
   const filteredPalettes = useMemo(() => {
     if (!isInitialized) return [];
     
     const staticPalettes = staticPalettesRef.current;
     const dbPalettes = dbPalettesRef.current;
-    const lowerQuery = searchQuery.toLowerCase().trim();
+    const lowerQuery = debouncedQuery.toLowerCase().trim();
     
-    if (!lowerQuery) {
+    if (!lowerQuery || lowerQuery.length < 2) {
       // No search: show DB palettes first, then static
-      // Refs ensure these are always the SAME object references
       return [...dbPalettes, ...staticPalettes];
     }
     
-    // Search mode: search through ALL palettes
-    const staticResults = searchAllPalettes(searchQuery);
-    
+    // Filter DB palettes locally (small set)
     const dbResults = dbPalettes.filter(p => 
       p.name.toLowerCase().includes(lowerQuery) || 
       p.tags.some(t => t.toLowerCase().includes(lowerQuery)) ||
       p.colors.some(c => c.toLowerCase().includes(lowerQuery))
     );
     
-    return [...dbResults, ...staticResults];
-  }, [searchQuery, isInitialized, loading]); // loading dependency ensures updates after loadMore
+    // Combine with async search results
+    return [...dbResults, ...searchResults];
+  }, [debouncedQuery, isInitialized, loading, searchResults]);
 
   // STABLE callback - never changes reference
   const handleOpenModal = useCallback((palette: Palette) => {
@@ -290,9 +314,10 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
           />
         </div>
 
-        <div className="text-sm text-muted-foreground">
-          {searchQuery 
-            ? `${filteredPalettes.length.toLocaleString()} results (all palettes)`
+        <div className="text-sm text-muted-foreground flex items-center gap-2">
+          {searching && <Loader2 className="w-4 h-4 animate-spin" />}
+          {debouncedQuery && debouncedQuery.length >= 2
+            ? `${filteredPalettes.length.toLocaleString()} results${filteredPalettes.length >= 200 ? ' (max 200)' : ''}`
             : `${(staticPalettesRef.current.length + dbPalettesRef.current.length).toLocaleString()} / ${(total + dbPalettesRef.current.length).toLocaleString()} loaded`
           }
         </div>
@@ -317,7 +342,7 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
         </div>
 
         {/* Infinite scroll loader */}
-        {hasMore && !searchQuery && (
+        {hasMore && (!debouncedQuery || debouncedQuery.length < 2) && (
           <div ref={loaderRef} className="flex justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>

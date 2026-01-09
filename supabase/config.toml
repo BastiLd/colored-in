@@ -18,3 +18,8 @@ verify_jwt = false
 # Webhooks come directly from Stripe, not authenticated users
 # Security is handled via webhook signature verification in the function
 verify_jwt = false
+
+[functions.analyze-asset]
+# Auth is verified manually inside the function using the Authorization header.
+# Keeping verify_jwt disabled prevents 401s at the Edge gateway while still enforcing auth in code.
+verify_jwt = false

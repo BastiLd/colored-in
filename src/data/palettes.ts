@@ -424,19 +424,64 @@ const planScrollLimits: Record<string, number> = {
   individual: 50000,
 };
 
-// Search all palettes (generates on-demand as needed)
+// Search all palettes with result limit to prevent UI freezing
+// Searches in chunks to keep UI responsive
+const MAX_SEARCH_RESULTS = 200;
+const SEARCH_CHUNK_SIZE = 500;
+
 export function searchAllPalettes(query: string): Palette[] {
   const lowerQuery = query.toLowerCase().trim();
-  if (!lowerQuery) return [];
+  if (!lowerQuery || lowerQuery.length < 2) return []; // Require at least 2 chars
   
   const results: Palette[] = [];
-  for (let i = 0; i < TARGET_PALETTE_COUNT; i++) {
+  
+  // Search in chunks, stop early when we have enough results
+  for (let i = 0; i < TARGET_PALETTE_COUNT && results.length < MAX_SEARCH_RESULTS; i++) {
     const palette = getPaletteByIndex(i);
     if (palette.name.toLowerCase().includes(lowerQuery) ||
-        palette.tags.some(tag => tag.includes(lowerQuery))) {
+        palette.tags.some(tag => tag.toLowerCase().includes(lowerQuery))) {
       results.push(palette);
     }
   }
+  return results;
+}
+
+// Async search for large datasets - yields control to UI periodically
+export async function searchAllPalettesAsync(
+  query: string, 
+  onProgress?: (results: Palette[], done: boolean) => void
+): Promise<Palette[]> {
+  const lowerQuery = query.toLowerCase().trim();
+  if (!lowerQuery || lowerQuery.length < 2) {
+    onProgress?.([], true);
+    return [];
+  }
+  
+  const results: Palette[] = [];
+  
+  for (let chunk = 0; chunk < TARGET_PALETTE_COUNT; chunk += SEARCH_CHUNK_SIZE) {
+    // Process one chunk
+    const chunkEnd = Math.min(chunk + SEARCH_CHUNK_SIZE, TARGET_PALETTE_COUNT);
+    for (let i = chunk; i < chunkEnd && results.length < MAX_SEARCH_RESULTS; i++) {
+      const palette = getPaletteByIndex(i);
+      if (palette.name.toLowerCase().includes(lowerQuery) ||
+          palette.tags.some(tag => tag.toLowerCase().includes(lowerQuery))) {
+        results.push(palette);
+      }
+    }
+    
+    // Stop if we have enough results
+    if (results.length >= MAX_SEARCH_RESULTS) {
+      onProgress?.(results, true);
+      return results;
+    }
+    
+    // Yield to UI between chunks
+    await new Promise(resolve => setTimeout(resolve, 0));
+    onProgress?.(results, false);
+  }
+  
+  onProgress?.(results, true);
   return results;
 }
 
