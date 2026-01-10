@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Home, Compass, Palette, Copy, Trash2, Sparkles, Upload, Link as LinkIcon, ExternalLink, Loader2, Image } from "lucide-react";
@@ -39,6 +39,7 @@ interface UserAsset {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +54,12 @@ const Dashboard = () => {
   const [loadingAssets, setLoadingAssets] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const initialView = params.get("view") as DashboardView | null;
+    if (initialView) {
+      setCurrentView(initialView);
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
@@ -73,7 +80,7 @@ const Dashboard = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, location.search]);
 
   const fetchUserData = async (userId: string) => {
     try {

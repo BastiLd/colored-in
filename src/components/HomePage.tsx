@@ -20,7 +20,10 @@ interface HomePageProps {
 
 // Interactive animated title
 function AnimatedTitle() {
-  const text = "The super fast color palettes generator!";
+  // Render as two lines to prevent awkward mid-word line breaks (each character is a span).
+  // This also guarantees "palettes" starts on the next line on the homepage.
+  const lines = ["The super fast color", "palettes generator!"];
+  const text = lines.join(" ");
   const [charStates, setCharStates] = useState<Map<number, {
     colored: boolean;
     timeout: NodeJS.Timeout | null;
@@ -152,27 +155,72 @@ function AnimatedTitle() {
   };
   return <div className="font-display">
       <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold italic leading-tight select-none">
-        {text.split("").map((char, i) => {
-        const state = charStates.get(i);
-        const isColored = state?.colored || false;
-        const isSpace = char === " ";
-        return <span key={i} ref={el => {
-          charRefs.current[i] = el;
-        }} className={`
-                inline-block transition-all cursor-default
-                ${!isSpace && !exploded && isColored ? "animate-shake" : ""}
-                ${!isSpace && !exploded && !isColored ? "hover:animate-shake" : ""}
-              `} style={{
-          color: isColored ? getRandomColor() : "#FFFFFF",
-          // Keep transform/opacity transitions ALWAYS active to prevent "teleporting"
-          // when we toggle exploded/flyingBack (otherwise transition+transform change in same frame may not animate).
-          transition: `${isColored ? "color 0.2s ease" : "color 0.5s ease 0.1s"}, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)`,
-          willChange: "transform, opacity",
-          ...getExplosionStyle(i)
-        }} onMouseEnter={() => handleMouseEnter(i, char)}>
-              {char === " " ? "\u00A0" : char}
-            </span>;
-      })}
+        {(() => {
+          const nodes: React.ReactNode[] = [];
+          let globalIndex = 0;
+
+          for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+            const line = lines[lineIdx];
+            if (lineIdx > 0) {
+              // In `text` we have a single separator space between lines (lines.join(" ")).
+              globalIndex += 1;
+            }
+
+            let linePos = 0;
+            const words = line.split(" ");
+
+            nodes.push(
+              <span key={`line-${lineIdx}`} className="block">
+                {words.map((word, wordIdx) => {
+                  if (wordIdx > 0) {
+                    // account for the space in the original `text`
+                    linePos += 1;
+                  }
+
+                  const wordStart = globalIndex + linePos;
+                  linePos += word.length;
+
+                  return (
+                    <span key={`word-${lineIdx}-${wordIdx}`} className="inline-block whitespace-nowrap">
+                      {word.split("").map((char, j) => {
+                        const i = wordStart + j;
+                        const state = charStates.get(i);
+                        const isColored = state?.colored || false;
+                        return (
+                          <span
+                            key={i}
+                            ref={(el) => {
+                              charRefs.current[i] = el;
+                            }}
+                            className={`
+                              inline-block transition-all cursor-default
+                              ${!exploded && isColored ? "animate-shake" : ""}
+                              ${!exploded && !isColored ? "hover:animate-shake" : ""}
+                            `}
+                            style={{
+                              color: isColored ? getRandomColor() : "#FFFFFF",
+                              transition: `${isColored ? "color 0.2s ease" : "color 0.5s ease 0.1s"}, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94)`,
+                              willChange: "transform, opacity",
+                              ...getExplosionStyle(i),
+                            }}
+                            onMouseEnter={() => handleMouseEnter(i, char)}
+                          >
+                            {char}
+                          </span>
+                        );
+                      })}
+                      {wordIdx < words.length - 1 ? "\u00A0" : null}
+                    </span>
+                  );
+                })}
+              </span>
+            );
+
+            globalIndex += line.length;
+          }
+
+          return nodes;
+        })()}
       </h1>
     </div>;
 }
@@ -329,8 +377,8 @@ export function HomePage({
     
     const paidPlans = ['pro', 'ultra', 'individual'];
     if (userPlan && paidPlans.includes(userPlan.toLowerCase())) {
-      // Has Pro+ plan - go directly to dashboard (which has the pro builder)
-      navigate("/dashboard");
+      // Has Pro+ plan - go directly to the dashboard's generator view (Pro Builder)
+      navigate("/dashboard?view=generator");
     } else {
       // Free plan - show upgrade prompt or use basic generator
       onStartGenerator();
