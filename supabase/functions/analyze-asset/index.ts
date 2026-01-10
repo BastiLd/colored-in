@@ -16,6 +16,19 @@ const corsHeaders = {
 // Analysis modes
 type AnalysisMode = 'extract' | 'expand' | 'improve';
 
+function tryParseSupabaseStorageUrl(assetUrl: string) {
+  try {
+    const u = new URL(assetUrl);
+    const m = u.pathname.match(/\/storage\/v1\/object\/(public|sign)\/([^/]+)\/(.+)$/);
+    if (!m) return null;
+    const bucket = m[2];
+    const path = decodeURIComponent(m[3]);
+    return { bucket, path };
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -146,18 +159,40 @@ Deno.serve(async (req: Request) => {
       if (isSupabaseUrl && !isDataUrl) {
         console.log('Converting Supabase Storage image to base64...');
         try {
-          // Fetch the image from Supabase Storage
-          const imageResponse = await fetch(assetUrl);
-          if (!imageResponse.ok) {
-            console.error('Failed to fetch image from storage:', imageResponse.status);
+          const parsed = tryParseSupabaseStorageUrl(assetUrl);
+          if (!parsed) {
+            console.error('Failed to parse Supabase Storage URL');
+            return new Response(
+              JSON.stringify({ error: 'Invalid image URL. Please try re-uploading.' }),
+              { status: 400, headers: corsHeaders }
+            );
+          }
+
+          // Download using service role (works for both public + private buckets and avoids 400s)
+          const { data: fileData, error: dlError } = await supabase
+            .storage
+            .from(parsed.bucket)
+            .download(parsed.path);
+
+          if (dlError || !fileData) {
+            console.error('Failed to download image from storage:', {
+              message: dlError?.message,
+              bucket: parsed.bucket,
+              pathPrefix: parsed.path.slice(0, 80),
+            });
             return new Response(
               JSON.stringify({ error: 'Failed to access image. Please try re-uploading.' }),
               { status: 400, headers: corsHeaders }
             );
           }
-          
+
+          const contentType =
+            // deno-lint-ignore no-explicit-any
+            (fileData as any)?.type ||
+            'image/png';
+
           // Get the image as ArrayBuffer and convert to base64
-          const arrayBuffer = await imageResponse.arrayBuffer();
+          const arrayBuffer = await fileData.arrayBuffer();
           const uint8Array = new Uint8Array(arrayBuffer);
           
           // Convert to base64
@@ -166,9 +201,6 @@ Deno.serve(async (req: Request) => {
             binary += String.fromCharCode(uint8Array[i]);
           }
           const base64 = btoa(binary);
-          
-          // Determine the content type
-          const contentType = imageResponse.headers.get('content-type') || 'image/png';
           
           // Create data URL
           imageUrlForAI = `data:${contentType};base64,${base64}`;
