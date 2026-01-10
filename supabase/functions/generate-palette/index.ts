@@ -25,6 +25,15 @@ const PLAN_LIMITS: Record<string, number> = {
   individual: Infinity, // Unlimited
 };
 
+function normalizePlan(plan: unknown): keyof typeof PLAN_LIMITS {
+  const p = (typeof plan === 'string' ? plan : '').toLowerCase();
+  if (!p) return 'free';
+  if (p.includes('individual')) return 'individual';
+  if (p.includes('ultra')) return 'ultra';
+  if (p.includes('pro')) return 'pro';
+  return 'free';
+}
+
 // Sanitize error messages to prevent information leakage
 function getSafeErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -224,7 +233,8 @@ Deno.serve((req) => {
       .eq('user_id', user.id)
       .single();
 
-    const userPlan = (subscriptionData?.is_active && subscriptionData?.plan) || 'free';
+    const rawPlan = (subscriptionData?.is_active && subscriptionData?.plan) || 'free';
+    const userPlan = normalizePlan(rawPlan);
     const planLimit = PLAN_LIMITS[userPlan] ?? PLAN_LIMITS.free;
     
     console.log('User plan:', userPlan, 'Limit:', planLimit);

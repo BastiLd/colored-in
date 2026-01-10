@@ -38,6 +38,14 @@ const SupabaseClient = {
   url: SUPABASE_URL,
   key: SUPABASE_ANON_KEY,
   accessToken: null,
+  normalizePlan: function (plan) {
+    const p = (typeof plan === 'string' ? plan : '').toLowerCase();
+    if (!p) return 'free';
+    if (p.includes('individual')) return 'individual';
+    if (p.includes('ultra')) return 'ultra';
+    if (p.includes('pro')) return 'pro';
+    return 'free';
+  },
   ensureConfig: async function () {
     await ensureRemoteSupabaseConfig();
     // sync any newly loaded config onto the client object
@@ -144,6 +152,7 @@ const SupabaseClient = {
 
   // Get user subscription
   async getUserSubscription(userId) {
+    await this.ensureConfig();
     const response = await fetch(
       `${this.url}/rest/v1/user_subscriptions?user_id=eq.${userId}&select=*`,
       {
@@ -161,6 +170,7 @@ const SupabaseClient = {
 
   // Get user assets
   async getUserAssets(userId) {
+    await this.ensureConfig();
     const response = await fetch(
       `${this.url}/rest/v1/user_assets?user_id=eq.${userId}&select=*&order=created_at.desc`,
       {
@@ -175,8 +185,66 @@ const SupabaseClient = {
     return await response.json();
   },
 
+  // Save a link or image asset record
+  async createUserAsset(payload) {
+    await this.ensureConfig();
+    const response = await fetch(`${this.url}/rest/v1/user_assets`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(true),
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      let errText = '';
+      try {
+        const err = await response.json();
+        errText = err?.message || err?.error || JSON.stringify(err);
+      } catch {
+        errText = await response.text();
+      }
+      throw new Error(errText || 'Failed to save asset');
+    }
+
+    const data = await response.json();
+    return data?.[0] || null;
+  },
+
+  // Upload an image to Storage and return its public URL
+  async uploadUserAssetImage(userId, file) {
+    await this.ensureConfig();
+    if (!file || !file.name) throw new Error('Missing file');
+
+    const safeExt = (file.name.split('.').pop() || 'png').replace(/[^a-zA-Z0-9]/g, '');
+    const fileName = `${Date.now()}-${Math.random().toString(16).slice(2)}.${safeExt}`;
+    const path = `${userId}/${fileName}`;
+    const bucket = 'user-assets';
+
+    const uploadRes = await fetch(`${this.url}/storage/v1/object/${bucket}/${encodeURIComponent(path)}`, {
+      method: 'POST',
+      headers: {
+        apikey: this.key,
+        Authorization: `Bearer ${this.accessToken}`,
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-upsert': 'true',
+      },
+      body: file,
+    });
+
+    if (!uploadRes.ok) {
+      const text = await uploadRes.text();
+      throw new Error(text || 'Failed to upload image');
+    }
+
+    const publicUrl = `${this.url}/storage/v1/object/public/${bucket}/${path}`;
+    return { publicUrl, bucket, path, filename: file.name };
+  },
+
   // Call Edge Function: generate-palette
   async generatePalette(prompt) {
+    await this.ensureConfig();
     const response = await fetch(`${this.url}/functions/v1/generate-palette`, {
       method: 'POST',
       headers: this.getHeaders(true),
@@ -193,6 +261,7 @@ const SupabaseClient = {
 
   // Call Edge Function: analyze-asset
   async analyzeAsset(assetType, assetUrl, mode = 'extract', expandText = '') {
+    await this.ensureConfig();
     const response = await fetch(`${this.url}/functions/v1/analyze-asset`, {
       method: 'POST',
       headers: this.getHeaders(true),

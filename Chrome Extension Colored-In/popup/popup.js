@@ -152,8 +152,10 @@ function setLoading(button, loading) {
 }
 
 function isPremiumUser() {
-  const plan = state.subscription?.plan?.toLowerCase();
-  return plan === 'ultra' || plan === 'individual';
+  const rawPlan = state.subscription?.plan;
+  const plan = window.SupabaseClient?.normalizePlan?.(rawPlan) || (typeof rawPlan === 'string' ? rawPlan.toLowerCase() : 'free');
+  const isActive = Boolean(state.subscription?.is_active);
+  return isActive && (plan === 'ultra' || plan === 'individual');
 }
 
 // ============================================
@@ -220,6 +222,8 @@ async function loadSubscription() {
   if (!state.user) return;
   
   try {
+    // Ensure remote config is loaded before making API calls
+    await SupabaseClient.ensureConfig();
     const subscription = await SupabaseClient.getUserSubscription(state.user.id);
     state.subscription = subscription;
   } catch (error) {
@@ -507,14 +511,62 @@ function selectNewLink() {
   showToast('Link selected');
 }
 
+async function saveNewLink() {
+  const url = elements.newLinkInput.value.trim();
+  if (!url) return;
+
+  try {
+    new URL(url);
+  } catch {
+    showToast('Please enter a valid URL', 'error');
+    return;
+  }
+
+  if (!state.user) {
+    showToast('Please sign in first', 'error');
+    return;
+  }
+
+  try {
+    setLoading(elements.addLinkBtn, true);
+    await SupabaseClient.ensureConfig();
+    const created = await SupabaseClient.createUserAsset({
+      user_id: state.user.id,
+      type: 'link',
+      url,
+      filename: null,
+    });
+
+    elements.newLinkInput.value = '';
+    await loadAssets();
+
+    if (created?.id) {
+      // Select the newly created asset
+      selectAsset(created);
+    } else {
+      // Fallback to selecting the raw URL
+      state.selectedAsset = url;
+      state.selectedAssetType = 'link';
+    }
+
+    showToast('Link saved!', 'success');
+  } catch (error) {
+    console.error('Failed to save link:', error);
+    showToast(error?.message || 'Failed to save link', 'error');
+  } finally {
+    setLoading(elements.addLinkBtn, false);
+  }
+}
+
 function handleImageSelect(event) {
   const file = event.target.files[0];
   if (!file) return;
   
   // Convert to data URL for preview
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     const dataUrl = e.target.result;
+    // Show immediate preview from local file
     state.selectedAsset = dataUrl;
     state.selectedAssetType = 'image';
     
@@ -522,7 +574,38 @@ function handleImageSelect(event) {
     elements.selectedAssetPreview.classList.remove('hidden');
     elements.assetPreviewContent.innerHTML = `<img src="${dataUrl}" alt="Selected">`;
     
-    showToast('Image selected');
+    showToast('Uploading image...', 'info');
+
+    if (!state.user) {
+      showToast('Please sign in first', 'error');
+      return;
+    }
+
+    try {
+      // Upload to storage and save to DB so it appears in Saved Assets + Dashboard
+      await SupabaseClient.ensureConfig();
+      const uploaded = await SupabaseClient.uploadUserAssetImage(state.user.id, file);
+      const created = await SupabaseClient.createUserAsset({
+        user_id: state.user.id,
+        type: 'image',
+        url: uploaded.publicUrl,
+        filename: uploaded.filename || file.name,
+      });
+
+      // Use the stored URL for analysis so the asset is persistent
+      state.selectedAsset = uploaded.publicUrl;
+      state.selectedAssetType = 'image';
+
+      await loadAssets();
+      if (created?.id) {
+        selectAsset(created);
+      }
+
+      showToast('Image saved!', 'success');
+    } catch (error) {
+      console.error('Failed to upload image:', error);
+      showToast(error?.message || 'Failed to upload image', 'error');
+    }
   };
   reader.readAsDataURL(file);
 }
@@ -730,7 +813,7 @@ function initEventListeners() {
     elements.newAssetPanel.classList.remove('hidden');
     elements.savedAssetsPanel.classList.add('hidden');
   });
-  elements.addLinkBtn.addEventListener('click', selectNewLink);
+  elements.addLinkBtn.addEventListener('click', saveNewLink);
   elements.uploadImageBtn.addEventListener('click', () => elements.newImageInput.click());
   elements.newImageInput.addEventListener('change', handleImageSelect);
   elements.analyzeBtn.addEventListener('click', openAnalyzeModal);

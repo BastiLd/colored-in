@@ -29,6 +29,15 @@ function tryParseSupabaseStorageUrl(assetUrl: string) {
   }
 }
 
+function normalizePlan(plan: unknown): 'free' | 'pro' | 'ultra' | 'individual' {
+  const p = (typeof plan === 'string' ? plan : '').toLowerCase();
+  if (!p) return 'free';
+  if (p.includes('individual')) return 'individual';
+  if (p.includes('ultra')) return 'ultra';
+  if (p.includes('pro')) return 'pro';
+  return 'free';
+}
+
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -125,11 +134,12 @@ Deno.serve(async (req: Request) => {
       .eq('user_id', userData.id)
       .single();
 
-    const userPlan = subscription?.plan?.toLowerCase() || 'free';
-    const isPremium = subscription?.is_active && (userPlan === 'ultra' || userPlan === 'individual');
+    const userPlan = normalizePlan(subscription?.plan);
+    const isActive = Boolean(subscription?.is_active);
+    const isPremium = isActive && (userPlan === 'ultra' || userPlan === 'individual');
     
     // For basic analysis, Pro is enough. For advanced modes, Ultra/Individual required
-    const isPaid = subscription?.is_active && subscription?.plan !== 'free';
+    const isPaid = isActive && userPlan !== 'free';
     
     if (!isPaid) {
       return new Response(
@@ -146,7 +156,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log('User plan check passed:', subscription?.plan, 'Mode:', mode);
+    console.log('User plan check passed:', subscription?.plan, 'Normalized:', userPlan, 'Mode:', mode);
 
     // If the image is from Supabase Storage, we need to fetch it and convert to base64
     // because OpenAI cannot access Supabase Storage URLs directly
@@ -445,8 +455,6 @@ Rules:
       );
     }
 
-    console.log('=== analyze-asset completed successfully ===');
-
     // Build response based on mode
     const response: Record<string, unknown> = {
       colors: parsedPalette.colors.map((c: string) => c.toUpperCase()),
@@ -459,6 +467,34 @@ Rules:
     if (mode === 'improve' && parsedPalette.colorDescriptions) {
       response.colorDescriptions = parsedPalette.colorDescriptions;
     }
+
+    // Save analyzed palette to public_palettes so it appears in the dashboard
+    try {
+      const tags: string[] = [
+        'analyzed',
+        String(mode),
+        String(assetType),
+      ];
+
+      const { error: insertError } = await supabase
+        .from('public_palettes')
+        .insert({
+          name: String(response.name || 'Analyzed Palette'),
+          colors: response.colors as string[],
+          tags,
+          created_by: userData.id,
+        });
+
+      if (insertError) {
+        console.error('Failed to save analyzed palette:', insertError);
+      } else {
+        console.log('Analyzed palette saved to public_palettes');
+      }
+    } catch (e) {
+      console.error('Failed to save analyzed palette (exception):', e);
+    }
+
+    console.log('=== analyze-asset completed successfully ===');
 
     return new Response(
       JSON.stringify(response),
