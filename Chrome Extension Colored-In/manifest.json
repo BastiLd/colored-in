@@ -21,7 +21,8 @@
     "storage",
     "activeTab",
     "clipboardWrite",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "https://gevqwporirhaekapftib.supabase.co/*",
@@ -33,8 +34,8 @@
   "commands": {
     "pick-color": {
       "suggested_key": {
-        "default": "Shift+C",
-        "mac": "Shift+C"
+        "default": "Alt+Shift+C",
+        "mac": "Alt+Shift+C"
       },
       "description": "Pick a color from the page"
     }

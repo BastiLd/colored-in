@@ -89,6 +89,8 @@
 
   let currentColor = null;
   let isPicking = false;
+  let captureImg = null;
+  let captureScale = null; // imageWidth / window.innerWidth
 
   // Function to get color at position
   function getColorAtPosition(x, y) {
@@ -155,6 +157,76 @@
     return '#FFFFFF';
   }
 
+  // Pixel-accurate color sampling from a screenshot (for hover magnifier).
+  async function ensureCapture() {
+    // Hide our UI so it doesn't appear in the screenshot.
+    const prevMagnifierDisplay = magnifier.style.display;
+    const prevPreviewDisplay = colorPreview.style.display;
+    magnifier.style.display = 'none';
+    colorPreview.style.display = 'none';
+
+    // #region agent log (debug-mode)
+    dbg('H9', 'Chrome Extension Colored-In/content/color-picker.js:CAPTURE_REQ', 'request capture', {
+      w: window.innerWidth,
+      h: window.innerHeight,
+      dpr: window.devicePixelRatio,
+    });
+    // #endregion
+
+    const resp = await chrome.runtime.sendMessage({ action: 'captureVisibleTab' });
+    if (!resp?.success || typeof resp.dataUrl !== 'string') {
+      // #region agent log (debug-mode)
+      dbg('H10', 'Chrome Extension Colored-In/content/color-picker.js:CAPTURE_FAIL', 'capture response not ok', {
+        success: resp?.success ?? null,
+        error: typeof resp?.error === 'string' ? resp.error.slice(0, 160) : null,
+      });
+      // #endregion
+      magnifier.style.display = prevMagnifierDisplay;
+      colorPreview.style.display = prevPreviewDisplay;
+      return;
+    }
+
+    const img = new Image();
+    img.src = resp.dataUrl;
+    try {
+      await img.decode();
+      captureImg = img;
+      captureScale = img.width / window.innerWidth;
+
+      // #region agent log (debug-mode)
+      dbg('H9', 'Chrome Extension Colored-In/content/color-picker.js:CAPTURE_OK', 'capture decoded', {
+        imgW: img.width,
+        imgH: img.height,
+        scale: captureScale,
+      });
+      // #endregion
+    } catch (e) {
+      // #region agent log (debug-mode)
+      dbg('H10', 'Chrome Extension Colored-In/content/color-picker.js:CAPTURE_DECODE_ERR', 'capture decode failed', {
+        message: typeof e?.message === 'string' ? e.message.slice(0, 160) : String(e),
+      });
+      // #endregion
+    } finally {
+      magnifier.style.display = prevMagnifierDisplay;
+      colorPreview.style.display = prevPreviewDisplay;
+    }
+  }
+
+  function samplePixelColor(x, y) {
+    if (!captureImg || !captureScale || !ctx) return null;
+    const sx = Math.max(0, Math.min(captureImg.width - 1, Math.floor(x * captureScale)));
+    const sy = Math.max(0, Math.min(captureImg.height - 1, Math.floor(y * captureScale)));
+    try {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.drawImage(captureImg, sx, sy, 1, 1, 0, 0, 1, 1);
+      const data = ctx.getImageData(0, 0, 1, 1).data;
+      const color = '#' + [data[0], data[1], data[2]].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase();
+      return color;
+    } catch (e) {
+      return null;
+    }
+  }
+
   // Convert RGB to HEX
   function rgbToHex(rgb) {
     // Handle rgba format
@@ -187,8 +259,8 @@
     colorPreview.style.top = (y + 130) + 'px';
     colorPreview.style.display = 'block';
     
-    // Get color at position
-    currentColor = getColorAtPosition(x, y);
+    // Get color at position (prefer pixel-sampling if we have a capture)
+    currentColor = samplePixelColor(x, y) || getColorAtPosition(x, y);
     
     // Update magnifier background
     magnifier.style.background = currentColor;
@@ -243,7 +315,7 @@
 
     // Fallback heuristic if EyeDropper unavailable/cancelled.
     if (!currentColor || typeof currentColor !== 'string' || !currentColor.startsWith('#')) {
-      currentColor = getColorAtPosition(e.clientX, e.clientY);
+      currentColor = samplePixelColor(e.clientX, e.clientY) || getColorAtPosition(e.clientX, e.clientY);
       // #region agent log (debug-mode)
       dbg('H6', 'Chrome Extension Colored-In/content/color-picker.js:CLICK', 'click picked color (fallback)', {
         color: currentColor,
@@ -349,14 +421,20 @@
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('click', handleClick, true);
     document.removeEventListener('keydown', handleKeyDown);
+    window.removeEventListener('scroll', ensureCapture, true);
+    window.removeEventListener('resize', ensureCapture);
     window.__coloredInPickerActive = false;
     isPicking = false;
+    captureImg = null;
+    captureScale = null;
   }
 
   // Add event listeners
   document.addEventListener('mousemove', handleMouseMove);
   document.addEventListener('click', handleClick, true);
   document.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('scroll', ensureCapture, true);
+  window.addEventListener('resize', ensureCapture);
 
   // Show initial instructions
   const instructions = document.createElement('div');
@@ -381,6 +459,9 @@
   `;
   
   document.body.appendChild(instructions);
+
+  // Get an initial capture so hover preview can be pixel-accurate.
+  ensureCapture();
   
   setTimeout(() => {
     instructions.style.opacity = '0';

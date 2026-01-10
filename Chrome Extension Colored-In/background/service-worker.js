@@ -3,7 +3,7 @@
 
 const DEBUG_ENDPOINT = 'http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa';
 const DEBUG_SESSION_ID = 'debug-session';
-const DEBUG_RUN_ID = 'color-picker-overlay-fix2';
+const DEBUG_RUN_ID = 'color-picker-hover-pixel';
 
 function dbg(hypothesisId, location, message, data) {
   try {
@@ -174,6 +174,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     sendResponse({ success: true });
     return true;
+  }
+
+  if (message.action === 'captureVisibleTab') {
+    // #region agent log (debug-mode)
+    dbg('H9', 'Chrome Extension Colored-In/background/service-worker.js:captureVisibleTab:REQ', 'capture request', {
+      hasSenderTab: Boolean(sender?.tab),
+      windowId: typeof sender?.tab?.windowId === 'number' ? sender.tab.windowId : null,
+    });
+    // #endregion
+
+    const windowId = typeof sender?.tab?.windowId === 'number' ? sender.tab.windowId : chrome.windows.WINDOW_ID_CURRENT;
+    try {
+      chrome.tabs.captureVisibleTab(windowId, { format: 'png' }, (dataUrl) => {
+        const err = chrome.runtime.lastError;
+        if (err) {
+          // #region agent log (debug-mode)
+          dbg('H10', 'Chrome Extension Colored-In/background/service-worker.js:captureVisibleTab:ERR', 'capture failed', {
+            message: typeof err.message === 'string' ? err.message.slice(0, 160) : String(err),
+          });
+          // #endregion
+          sendResponse({ success: false, error: err.message });
+          return;
+        }
+        // #region agent log (debug-mode)
+        dbg('H9', 'Chrome Extension Colored-In/background/service-worker.js:captureVisibleTab:OK', 'capture ok', {
+          dataUrlPrefix: typeof dataUrl === 'string' ? dataUrl.slice(0, 30) : null,
+          dataUrlLen: typeof dataUrl === 'string' ? dataUrl.length : null,
+        });
+        // #endregion
+        sendResponse({ success: true, dataUrl });
+      });
+      return true; // async
+    } catch (e) {
+      // #region agent log (debug-mode)
+      dbg('H10', 'Chrome Extension Colored-In/background/service-worker.js:captureVisibleTab:CATCH', 'capture threw', {
+        message: typeof e?.message === 'string' ? e.message.slice(0, 160) : String(e),
+      });
+      // #endregion
+      sendResponse({ success: false, error: 'capture threw' });
+      return true;
+    }
   }
 
   // #region agent log (debug-mode)
