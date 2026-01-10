@@ -35,15 +35,15 @@ chrome.commands.onCommand.addListener(async (command) => {
   // #endregion
   
   if (command === 'pick-color') {
-    await activateColorPicker();
+    await activateColorPicker({ source: 'command' });
   }
 });
 
 // Activate color picker in the current tab using EyeDropper API
-async function activateColorPicker() {
+async function activateColorPicker({ source } = { source: 'unknown' }) {
   try {
     // #region agent log (debug-mode)
-    dbg('H2', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:ENTRY', 'activateColorPicker called', {});
+    dbg('H2', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:ENTRY', 'activateColorPicker called', { source });
     // #endregion
     // Get the current active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -87,120 +87,60 @@ async function activateColorPicker() {
       return;
     }
     
-    // Inject and execute the EyeDropper API code
+    // KEYBOARD SHORTCUT PATH:
+    // EyeDropper.open() requires a user gesture; Chrome commands do NOT count as one.
+    // So for shortcut-triggered picks, use our overlay-based picker content script.
+    if (source === 'command') {
+      // #region agent log (debug-mode)
+      dbg('H4', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:OVERLAY', 'Using overlay picker (command source)', {});
+      // #endregion
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['content/color-picker.js'],
+      });
+      return;
+    }
+
+    // POPUP/CLICK PATH (user gesture): try EyeDropper first.
     const results = await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: async () => {
-        // Check if EyeDropper API is available
         if (!('EyeDropper' in window)) {
-          // Fallback notification
-          const notification = document.createElement('div');
-          notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            background: #1a1a24;
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 14px;
-            border-radius: 8px;
-            border: 1px solid #8b5cf6;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            z-index: 2147483647;
-          `;
-          notification.textContent = 'EyeDropper API is not supported in this browser. Please use Chrome 95+.';
-          document.body.appendChild(notification);
-          setTimeout(() => notification.remove(), 3000);
           return { success: false, error: 'EyeDropper not supported' };
         }
-        
         try {
           const eyeDropper = new EyeDropper();
           const result = await eyeDropper.open();
           const color = result.sRGBHex.toUpperCase();
-          
-          // Copy to clipboard
           await navigator.clipboard.writeText(color);
-          
-          // Show success notification
-          const notification = document.createElement('div');
-          notification.style.cssText = `
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            background: #1a1a24;
-            color: white;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 14px;
-            border-radius: 8px;
-            border: 1px solid #8b5cf6;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-            z-index: 2147483647;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            animation: slideUp 0.3s ease;
-          `;
-          
-          // Add animation
-          const style = document.createElement('style');
-          style.textContent = `
-            @keyframes slideUp {
-              from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(20px);
-              }
-              to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
-              }
-            }
-          `;
-          document.head.appendChild(style);
-          
-          notification.innerHTML = `
-            <div style="width: 24px; height: 24px; background: ${color}; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2);"></div>
-            <span>Copied <strong>${color}</strong> to clipboard!</span>
-          `;
-          
-          document.body.appendChild(notification);
-          
-          setTimeout(() => {
-            notification.style.opacity = '0';
-            notification.style.transition = 'opacity 0.3s ease';
-            setTimeout(() => {
-              notification.remove();
-              style.remove();
-            }, 300);
-          }, 2000);
-          
           return { success: true, color };
         } catch (error) {
-          // User cancelled the picker
-          console.log('Color picker cancelled or error:', error.message);
-          return { success: false, error: error.message };
+          return { success: false, error: error?.message || String(error) };
         }
-      }
+      },
     });
-    
-    console.log('Color picker result:', results);
+
     // #region agent log (debug-mode)
-    dbg('H4', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:RESULT', 'executeScript returned', {
+    dbg('H4', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:EYEDROPPER_RESULT', 'EyeDropper attempt returned', {
       hasResults: Array.isArray(results),
-      firstResultKeys: results?.[0]?.result ? Object.keys(results[0].result) : null,
       success: results?.[0]?.result?.success ?? null,
       error: typeof results?.[0]?.result?.error === 'string' ? results[0].result.error.slice(0, 80) : null,
     });
     // #endregion
-    
-    if (results && results[0] && results[0].result && results[0].result.success) {
-      // Store the picked color
+
+    if (results?.[0]?.result?.success) {
       chrome.storage.local.set({ lastPickedColor: results[0].result.color });
+      return;
     }
+
+    // Fallback (e.g. gesture missing): overlay picker.
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['content/color-picker.js'],
+    });
+    // #region agent log (debug-mode)
+    dbg('H4', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:OVERLAY_FALLBACK', 'Fell back to overlay picker', {});
+    // #endregion
     
   } catch (error) {
     console.error('Failed to activate color picker:', error);
@@ -217,7 +157,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Message received:', message);
   
   if (message.action === 'pickColor') {
-    activateColorPicker().then(() => {
+    activateColorPicker({ source: 'popup' }).then(() => {
       sendResponse({ success: true });
     }).catch((error) => {
       sendResponse({ success: false, error: error.message });

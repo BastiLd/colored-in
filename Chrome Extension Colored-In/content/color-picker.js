@@ -173,6 +173,13 @@
         document.body.removeChild(input);
         showNotification(currentColor);
       });
+
+      // Best-effort: notify background so popup can display last picked color if needed.
+      try {
+        chrome.runtime.sendMessage({ action: 'colorPicked', color: currentColor });
+      } catch {
+        // ignore
+      }
     }
     
     cleanup();
