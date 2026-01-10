@@ -1,9 +1,38 @@
 // Colored In - Background Service Worker
 // Handles keyboard shortcuts and color picker using EyeDropper API
 
+const DEBUG_ENDPOINT = 'http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa';
+const DEBUG_SESSION_ID = 'debug-session';
+const DEBUG_RUN_ID = 'color-picker-pre-fix';
+
+function dbg(hypothesisId, location, message, data) {
+  try {
+    fetch(DEBUG_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: DEBUG_SESSION_ID,
+        runId: DEBUG_RUN_ID,
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
+}
+
 // Listen for keyboard shortcut commands
 chrome.commands.onCommand.addListener(async (command) => {
   console.log('Command received:', command);
+  // #region agent log (debug-mode)
+  dbg('H1', 'Chrome Extension Colored-In/background/service-worker.js:onCommand', 'Command received', {
+    command,
+  });
+  // #endregion
   
   if (command === 'pick-color') {
     await activateColorPicker();
@@ -13,20 +42,48 @@ chrome.commands.onCommand.addListener(async (command) => {
 // Activate color picker in the current tab using EyeDropper API
 async function activateColorPicker() {
   try {
+    // #region agent log (debug-mode)
+    dbg('H2', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:ENTRY', 'activateColorPicker called', {});
+    // #endregion
     // Get the current active tab
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     if (!tab) {
       console.error('No active tab found');
+      // #region agent log (debug-mode)
+      dbg('H2', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:NO_TAB', 'No active tab found', {});
+      // #endregion
       return;
     }
     
+    const tabUrl = typeof tab.url === 'string' ? tab.url : null;
+    // #region agent log (debug-mode)
+    dbg('H2', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:TAB', 'Active tab snapshot', {
+      tabId: tab.id ?? null,
+      urlPresent: Boolean(tabUrl),
+      urlPrefix: tabUrl ? tabUrl.slice(0, 32) : null,
+    });
+    // #endregion
+
     // Check if we can inject into this tab
-    if (tab.url.startsWith('chrome://') || 
-        tab.url.startsWith('chrome-extension://') ||
-        tab.url.startsWith('edge://') ||
-        tab.url.startsWith('about:')) {
+    if (!tabUrl) {
+      console.log('Cannot inject: tab.url missing');
+      // #region agent log (debug-mode)
+      dbg('H3', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:URL_MISSING', 'Cannot inject: tab.url missing', {});
+      // #endregion
+      return;
+    }
+
+    if (tabUrl.startsWith('chrome://') || 
+        tabUrl.startsWith('chrome-extension://') ||
+        tabUrl.startsWith('edge://') ||
+        tabUrl.startsWith('about:')) {
       console.log('Cannot inject into browser internal pages');
+      // #region agent log (debug-mode)
+      dbg('H3', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:INTERNAL_PAGE', 'Cannot inject into internal page', {
+        urlPrefix: tabUrl.slice(0, 32),
+      });
+      // #endregion
       return;
     }
     
@@ -131,6 +188,14 @@ async function activateColorPicker() {
     });
     
     console.log('Color picker result:', results);
+    // #region agent log (debug-mode)
+    dbg('H4', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:RESULT', 'executeScript returned', {
+      hasResults: Array.isArray(results),
+      firstResultKeys: results?.[0]?.result ? Object.keys(results[0].result) : null,
+      success: results?.[0]?.result?.success ?? null,
+      error: typeof results?.[0]?.result?.error === 'string' ? results[0].result.error.slice(0, 80) : null,
+    });
+    // #endregion
     
     if (results && results[0] && results[0].result && results[0].result.success) {
       // Store the picked color
@@ -139,6 +204,11 @@ async function activateColorPicker() {
     
   } catch (error) {
     console.error('Failed to activate color picker:', error);
+    // #region agent log (debug-mode)
+    dbg('H5', 'Chrome Extension Colored-In/background/service-worker.js:activateColorPicker:CATCH', 'activateColorPicker threw', {
+      message: typeof error?.message === 'string' ? error.message.slice(0, 120) : String(error),
+    });
+    // #endregion
   }
 }
 
