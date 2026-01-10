@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "Colored In",
+  "version": "1.0.0",
+  "description": "AI-powered color palette generator. Create beautiful palettes, analyze images, and pick colors from any webpage.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Colored In"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "clipboardWrite",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://gevqwporirhaekapftib.supabase.co/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  "commands": {
+    "pick-color": {
+      "suggested_key": {
+        "default": "Alt+Shift+C",
+        "mac": "Alt+Shift+C"
+      },
+      "description": "Pick a color from the page"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["content/color-picker.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
