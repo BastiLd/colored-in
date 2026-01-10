@@ -329,8 +329,8 @@ export function HomePage({
     
     const paidPlans = ['pro', 'ultra', 'individual'];
     if (userPlan && paidPlans.includes(userPlan.toLowerCase())) {
-      // Has Pro+ plan - go directly to pro builder
-      navigate("/pro-builder");
+      // Has Pro+ plan - go directly to dashboard (which has the pro builder)
+      navigate("/dashboard");
     } else {
       // Free plan - show upgrade prompt or use basic generator
       onStartGenerator();

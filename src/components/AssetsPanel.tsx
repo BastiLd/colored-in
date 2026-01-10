@@ -256,11 +256,11 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
         <Button
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading || imageAssets.length >= planLimits.maxImages}
-          className="w-full"
+          className="w-full min-w-0"
           size="sm"
         >
-          <Upload className="w-4 h-4 mr-2" />
-          {isUploading ? "Uploading..." : "Upload Image"}
+          <Upload className="w-4 h-4 mr-2 flex-shrink-0" />
+          <span className="truncate">{isUploading ? "Uploading..." : "Upload Image"}</span>
         </Button>
       </div>
 

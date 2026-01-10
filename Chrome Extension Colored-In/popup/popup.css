@@ -657,7 +657,29 @@ body {
 }
 
 .palette-info {
+  padding: 12px;
   color: #ffffff;
+}
+
+/* Additional text color fixes */
+.mode-info h4 {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.mode-info p {
+  color: #e0e0e0;
+  font-weight: 500;
+}
+
+.action-card h3 {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.action-card p {
+  color: #e0e0e0;
+  font-weight: 500;
 }
 
 /* Analyze View */
