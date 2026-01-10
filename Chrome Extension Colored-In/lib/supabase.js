@@ -12,23 +12,6 @@ async function loadRemoteSupabaseConfig() {
   try {
     const res = await fetch(REMOTE_SUPABASE_CONFIG_URL, { cache: 'no-store' });
     if (!res.ok) {
-      // #region agent log (debug-mode)
-      try {
-        fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'pre-fix',
-            hypothesisId: 'H4',
-            location: 'Chrome Extension Colored-In/lib/supabase.js:loadRemoteSupabaseConfig:HTTP_ERROR',
-            message: 'Remote supabase-config.json fetch failed',
-            data: { status: res.status },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-      } catch {}
-      // #endregion
       return;
     }
     const cfg = await res.json();
@@ -40,48 +23,7 @@ async function loadRemoteSupabaseConfig() {
       SUPABASE_ANON_KEY = nextKey;
       remoteConfigLoaded = true;
     }
-
-    // #region agent log (debug-mode)
-    try {
-      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
-          hypothesisId: 'H4',
-          location: 'Chrome Extension Colored-In/lib/supabase.js:loadRemoteSupabaseConfig:SUCCESS',
-          message: 'Remote supabase-config.json loaded',
-          data: {
-            remoteConfigLoaded,
-            urlHost: (() => {
-              try { return nextUrl ? new URL(nextUrl).host : null; } catch { return null; }
-            })(),
-            keyLen: nextKey?.length ?? 0,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    } catch {}
-    // #endregion
   } catch {
-    // #region agent log (debug-mode)
-    try {
-      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
-          hypothesisId: 'H4',
-          location: 'Chrome Extension Colored-In/lib/supabase.js:loadRemoteSupabaseConfig:NETWORK_ERROR',
-          message: 'Remote supabase-config.json fetch errored',
-          data: {},
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    } catch {}
-    // #endregion
   }
 }
 
@@ -90,33 +32,6 @@ function ensureRemoteSupabaseConfig() {
   remoteConfigLoadPromise = loadRemoteSupabaseConfig();
   return remoteConfigLoadPromise;
 }
-
-// #region agent log (debug-mode)
-try {
-  fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
-      hypothesisId: 'H3',
-      location: 'Chrome Extension Colored-In/lib/supabase.js:SUPABASE_CONFIG',
-      message: 'Supabase config snapshot (extension)',
-      data: {
-        urlHost: (() => {
-          try { return new URL(SUPABASE_URL).host; } catch { return null; }
-        })(),
-        keyPresent: Boolean(SUPABASE_ANON_KEY),
-        keyLen: SUPABASE_ANON_KEY?.length ?? 0,
-        keyLooksJwt: typeof SUPABASE_ANON_KEY === 'string' ? SUPABASE_ANON_KEY.startsWith('eyJ') : false,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-} catch {
-  // ignore
-}
-// #endregion
 
 // Simple Supabase client for extension
 const SupabaseClient = {
@@ -151,34 +66,6 @@ const SupabaseClient = {
   async signIn(email, password) {
     await this.ensureConfig();
 
-    // #region agent log (debug-mode)
-    try {
-      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'pre-fix',
-          hypothesisId: 'H3',
-          location: 'Chrome Extension Colored-In/lib/supabase.js:signIn:ENTRY',
-          message: 'Extension signIn called',
-          data: {
-            hasAt: typeof email === 'string' ? email.includes('@') : false,
-            emailLen: typeof email === 'string' ? email.length : 0,
-            urlHost: (() => {
-              try { return this.url ? new URL(this.url).host : null; } catch { return null; }
-            })(),
-            keyLen: typeof this.key === 'string' ? this.key.length : 0,
-            remoteConfigLoaded,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-    } catch {
-      // ignore
-    }
-    // #endregion
-
     const response = await fetch(`${this.url}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -187,31 +74,6 @@ const SupabaseClient = {
 
     if (!response.ok) {
       const error = await response.json();
-      // #region agent log (debug-mode)
-      try {
-        fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'pre-fix',
-            hypothesisId: 'H3',
-            location: 'Chrome Extension Colored-In/lib/supabase.js:signIn:ERROR',
-            message: 'Extension signIn failed',
-            data: {
-              status: response.status,
-              errorCode: error?.error ?? null,
-              hasErrorDescription: Boolean(error?.error_description),
-              hasMessage: Boolean(error?.message),
-              messageSnippet: typeof error?.message === 'string' ? error.message.slice(0, 60) : null,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-      } catch {
-        // ignore
-      }
-      // #endregion
       throw new Error(error.error_description || error.message || 'Login failed');
     }
 

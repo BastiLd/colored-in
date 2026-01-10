@@ -9,33 +9,6 @@ const SUPABASE_PUBLISHABLE_KEY = (
   (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined)
 )?.trim();
 
-// #region agent log (debug-mode)
-try {
-  fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sessionId: 'debug-session',
-      runId: 'pre-fix',
-      hypothesisId: 'H1',
-      location: 'src/integrations/supabase/client.ts:SUPABASE_CONFIG',
-      message: 'Supabase config snapshot (web app)',
-      data: {
-        urlPresent: Boolean(SUPABASE_URL),
-        urlHost: SUPABASE_URL ? new URL(SUPABASE_URL).host : null,
-        keyPresent: Boolean(SUPABASE_PUBLISHABLE_KEY),
-        keyLen: SUPABASE_PUBLISHABLE_KEY?.length ?? 0,
-        configError: !SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY,
-        href: typeof location !== 'undefined' ? location.href : null,
-      },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-} catch {
-  // ignore
-}
-// #endregion
-
 export const supabaseConfig = {
   url: SUPABASE_URL,
   // Never expose the full key; this is only for basic debugging in UI.
