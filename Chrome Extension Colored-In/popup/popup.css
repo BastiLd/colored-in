@@ -639,9 +639,10 @@ body {
 
 .palette-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: color 0.2s;
+  color: #ffffff;
 }
 
 .palette-name:hover {
@@ -650,8 +651,13 @@ body {
 
 .palette-description {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #ffffff;
+  font-weight: 600;
   margin-top: 4px;
+}
+
+.palette-info {
+  color: #ffffff;
 }
 
 /* Analyze View */

@@ -255,6 +255,7 @@ export function HomePage({
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [userPlan, setUserPlan] = useState<string | null>(null);
   const featuredPalette = palettes[featuredIndex];
 
   // Auth state
@@ -262,11 +263,43 @@ export function HomePage({
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
+        if (session?.user) {
+          // Fetch user plan
+          supabase
+            .from('user_subscriptions')
+            .select('plan, is_active')
+            .eq('user_id', session.user.id)
+            .single()
+            .then(({ data }) => {
+              if (data?.is_active && data?.plan) {
+                setUserPlan(data.plan);
+              } else {
+                setUserPlan('free');
+              }
+            });
+        } else {
+          setUserPlan(null);
+        }
       }
     );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        // Fetch user plan
+        supabase
+          .from('user_subscriptions')
+          .select('plan, is_active')
+          .eq('user_id', session.user.id)
+          .single()
+          .then(({ data }) => {
+            if (data?.is_active && data?.plan) {
+              setUserPlan(data.plan);
+            } else {
+              setUserPlan('free');
+            }
+          });
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -283,6 +316,25 @@ export function HomePage({
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out");
+  };
+
+  // Handle Manual Generator click with plan check
+  const handleManualGenerator = () => {
+    if (!user) {
+      // Not logged in - redirect to auth
+      toast.info("Please sign in to access the Manual Generator");
+      navigate("/auth");
+      return;
+    }
+    
+    const paidPlans = ['pro', 'ultra', 'individual'];
+    if (userPlan && paidPlans.includes(userPlan.toLowerCase())) {
+      // Has Pro+ plan - go directly to pro builder
+      navigate("/pro-builder");
+    } else {
+      // Free plan - show upgrade prompt or use basic generator
+      onStartGenerator();
+    }
   };
 
   return <div className="min-h-screen bg-background relative">
@@ -338,17 +390,18 @@ export function HomePage({
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left - Text */}
           <div className="space-y-8">
-            <AnimatedTitle />
-            
-            <p className="text-lg text-muted-foreground max-w-md">
-              Create the perfect palette or get inspired by thousands of beautiful color schemes.
-            </p>
+            <div className="space-y-4">
+              <AnimatedTitle />
+              <p className="text-lg text-muted-foreground max-w-md">
+                Create the perfect palette or get inspired by thousands of beautiful color schemes.
+              </p>
+            </div>
 
             <div className="flex flex-wrap gap-4">
               <button onClick={() => setShowAIGenerator(true)} className="px-6 py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all shadow-lg">
                 Generate with AI
               </button>
-              <button onClick={onStartGenerator} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors">
+              <button onClick={handleManualGenerator} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors">
                 Manual Generator
               </button>
               <button onClick={onBrowsePalettes} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors">

@@ -392,6 +392,8 @@ async function loadAssets() {
   elements.savedAssetsList.innerHTML = '<p class="loading-text">Loading assets...</p>';
   
   try {
+    // Ensure remote config is loaded before making API calls
+    await SupabaseClient.ensureConfig();
     const assets = await SupabaseClient.getUserAssets(state.user.id);
     state.assets = assets;
     renderAssets(assets);
@@ -738,13 +740,21 @@ function initEventListeners() {
   elements.modeExpand.addEventListener('click', () => analyzeWithMode('expand'));
   elements.modeImprove.addEventListener('click', () => analyzeWithMode('improve'));
   elements.modeExtract.addEventListener('click', () => analyzeWithMode('extract'));
-  elements.confirmExpandBtn.addEventListener('click', () => {
+  elements.confirmExpandBtn.addEventListener('click', async () => {
     const text = elements.expandText.value.trim();
     if (!text) {
       showToast('Please enter a description', 'error');
       return;
     }
-    performAnalysis('expand', text);
+    // Disable button and show loading
+    elements.confirmExpandBtn.disabled = true;
+    elements.confirmExpandBtn.textContent = 'Generating...';
+    try {
+      await performAnalysis('expand', text);
+    } finally {
+      elements.confirmExpandBtn.disabled = false;
+      elements.confirmExpandBtn.textContent = 'Generate Palette';
+    }
   });
 
   // Detail View

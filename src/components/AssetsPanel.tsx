@@ -232,9 +232,9 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0 overflow-hidden">
       {/* Upload Images Section */}
-      <div>
+      <div className="min-w-0">
         <h3 className="font-semibold mb-2 flex items-center gap-2">
           <Upload className="w-4 h-4" />
           Upload Images
@@ -264,75 +264,80 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
         </Button>
       </div>
 
-      {/* Images Grid */}
+      {/* Images Grid - Horizontal scroll when space is limited */}
       {imageAssets.length > 0 && (
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground mb-2">Your Images</p>
-          <div className="grid grid-cols-2 gap-2">
-            {imageAssets.map((asset) => {
-              const isSelected = selectedAssetId === asset.id;
-              const isAnalyzing = analyzingAssetId === asset.id;
-              
-              return (
-                <div
-                  key={asset.id}
-                  className={`relative group rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
-                    isSelected 
-                      ? "border-primary ring-2 ring-primary/30" 
-                      : "border-border hover:border-primary/50"
-                  }`}
-                  onClick={() => handleSelectAsset(asset.id)}
-                >
-                  <img 
-                    src={asset.url} 
-                    alt={asset.filename || ""} 
-                    className="w-full aspect-square object-cover"
-                  />
-                  
-                  {/* Selection indicator */}
-                  {isSelected && (
-                    <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                      <Check className="w-3 h-3 text-primary-foreground" />
+          <div className="overflow-x-auto pb-2">
+            <div className="flex gap-2 min-w-max">
+              {imageAssets.map((asset) => {
+                const isSelected = selectedAssetId === asset.id;
+                const isAnalyzing = analyzingAssetId === asset.id;
+                
+                return (
+                  <div
+                    key={asset.id}
+                    className={`relative group rounded-lg overflow-hidden border-2 transition-all cursor-pointer flex-shrink-0 w-24 h-24 ${
+                      isSelected 
+                        ? "border-primary ring-2 ring-primary/30" 
+                        : "border-border hover:border-primary/50"
+                    }`}
+                    onClick={() => handleSelectAsset(asset.id)}
+                  >
+                    <img 
+                      src={asset.url} 
+                      alt={asset.filename || ""} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                      }}
+                    />
+                    
+                    {/* Selection indicator */}
+                    {isSelected && (
+                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                        <Check className="w-3 h-3 text-primary-foreground" />
+                      </div>
+                    )}
+                    
+                    {/* Overlay with actions */}
+                    <div className={`absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1 transition-opacity ${
+                      isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    }`}>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAnalyze(asset);
+                        }}
+                        disabled={isAnalyzing}
+                        className="text-xs h-7 px-2"
+                      >
+                        {isAnalyzing ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3 h-3" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(asset.id, asset.url, asset.type);
+                        }}
+                        className="text-xs h-7 px-2"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
                     </div>
-                  )}
-                  
-                  {/* Overlay with actions */}
-                  <div className={`absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 transition-opacity ${
-                    isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                  }`}>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleAnalyze(asset);
-                      }}
-                      disabled={isAnalyzing}
-                      className="text-xs"
-                    >
-                      {isAnalyzing ? (
-                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-3 h-3 mr-1" />
-                      )}
-                      Analyze
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(asset.id, asset.url, asset.type);
-                      }}
-                      className="text-xs"
-                    >
-                      <Trash2 className="w-3 h-3 mr-1" />
-                      Delete
-                    </Button>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
@@ -373,7 +378,7 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
 
       {/* Links List */}
       {linkAssets.length > 0 && (
-        <div>
+        <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground mb-2">Your Links</p>
           <div className="space-y-2">
             {linkAssets.map((asset) => {
@@ -392,7 +397,7 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
               return (
                 <div
                   key={asset.id}
-                  className={`flex items-center gap-2 p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${
                     isSelected 
                       ? "border-primary bg-primary/5 ring-2 ring-primary/30" 
                       : "border-border bg-muted/50 hover:border-primary/50"
@@ -400,17 +405,16 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
                   onClick={() => handleSelectAsset(asset.id)}
                 >
                   {/* Selection indicator */}
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
                     isSelected ? "bg-primary" : "bg-muted border border-border"
                   }`}>
-                    {isSelected && <Check className="w-3 h-3 text-primary-foreground" />}
+                    {isSelected && <Check className="w-2 h-2 text-primary-foreground" />}
                   </div>
                   
-                  <LinkIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <LinkIcon className="w-3 h-3 text-muted-foreground flex-shrink-0" />
                   
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{displayUrl}</p>
-                    <p className="text-xs text-muted-foreground truncate">{asset.url}</p>
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <p className="text-xs font-medium truncate break-all">{displayUrl}</p>
                   </div>
                   
                   <div className="flex items-center gap-1 flex-shrink-0">

@@ -135,6 +135,58 @@ Deno.serve(async (req: Request) => {
 
     console.log('User plan check passed:', subscription?.plan, 'Mode:', mode);
 
+    // If the image is from Supabase Storage, we need to fetch it and convert to base64
+    // because OpenAI cannot access Supabase Storage URLs directly
+    let imageUrlForAI = assetUrl;
+    
+    if (assetType === 'image') {
+      const isSupabaseUrl = assetUrl.includes('supabase.co/storage');
+      const isDataUrl = assetUrl.startsWith('data:');
+      
+      if (isSupabaseUrl && !isDataUrl) {
+        console.log('Converting Supabase Storage image to base64...');
+        try {
+          // Fetch the image from Supabase Storage
+          const imageResponse = await fetch(assetUrl);
+          if (!imageResponse.ok) {
+            console.error('Failed to fetch image from storage:', imageResponse.status);
+            return new Response(
+              JSON.stringify({ error: 'Failed to access image. Please try re-uploading.' }),
+              { status: 400, headers: corsHeaders }
+            );
+          }
+          
+          // Get the image as ArrayBuffer and convert to base64
+          const arrayBuffer = await imageResponse.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Convert to base64
+          let binary = '';
+          for (let i = 0; i < uint8Array.length; i++) {
+            binary += String.fromCharCode(uint8Array[i]);
+          }
+          const base64 = btoa(binary);
+          
+          // Determine the content type
+          const contentType = imageResponse.headers.get('content-type') || 'image/png';
+          
+          // Create data URL
+          imageUrlForAI = `data:${contentType};base64,${base64}`;
+          console.log('Image converted to base64, length:', base64.length);
+        } catch (fetchError) {
+          console.error('Error converting image to base64:', fetchError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to process image. Please try again.' }),
+            { status: 500, headers: corsHeaders }
+          );
+        }
+      } else if (isDataUrl) {
+        // Already a data URL, use as-is
+        imageUrlForAI = assetUrl;
+        console.log('Image is already a data URL');
+      }
+    }
+
     // Build prompts based on mode
     let systemPrompt: string;
     let userContent: { type: string; text?: string; image_url?: { url: string } }[];
@@ -156,7 +208,7 @@ Rules:
 
         userContent = [
           { type: "text", text: "Extract all the dominant colors actually present in this image:" },
-          { type: "image_url", image_url: { url: assetUrl } }
+          { type: "image_url", image_url: { url: imageUrlForAI } }
         ];
       } else {
         systemPrompt = `You are a web design color analyst. Analyze the website URL provided and determine what colors are likely used on that type of site. Extract between 2 and 10 colors.
@@ -196,7 +248,7 @@ Rules:
 
         userContent = [
           { type: "text", text: `Create a palette inspired by this image, following this direction: "${userDescription}"` },
-          { type: "image_url", image_url: { url: assetUrl } }
+          { type: "image_url", image_url: { url: imageUrlForAI } }
         ];
       } else {
         systemPrompt = `You are a creative color palette designer. Analyze the website type AND incorporate the user's creative direction.
@@ -245,7 +297,7 @@ Rules:
 
         userContent = [
           { type: "text", text: "Analyze this image and create an improved color palette with detailed explanations for each color choice:" },
-          { type: "image_url", image_url: { url: assetUrl } }
+          { type: "image_url", image_url: { url: imageUrlForAI } }
         ];
       } else {
         systemPrompt = `You are an expert color consultant and UX designer. Analyze this website URL - understand its likely purpose, target audience, industry, and typical color usage. Then create an IMPROVED color palette that would make it more effective, appealing, and professional.
