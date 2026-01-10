@@ -88,6 +88,7 @@
   document.body.appendChild(colorPreview);
 
   let currentColor = null;
+  let isPicking = false;
 
   // Function to get color at position
   function getColorAtPosition(x, y) {
@@ -95,14 +96,18 @@
     // Workaround: sample computed backgroundColor of the *underlying* element.
     // Important: our overlay sits on top, so elementFromPoint() would return the overlay.
     const elements = document.elementsFromPoint(x, y);
+
+    // Prefer an element that actually has a non-transparent background color.
     const element = elements.find((el) => {
       if (!(el instanceof Element)) return false;
       const id = el.id || '';
-      return (
+      const isOurUi =
         id !== 'colored-in-picker-overlay' &&
         id !== 'colored-in-magnifier' &&
-        id !== 'colored-in-color-preview'
-      );
+        id !== 'colored-in-color-preview';
+      if (!isOurUi) return false;
+      const bg = window.getComputedStyle(el).backgroundColor;
+      return bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
     });
     
     if (element) {
@@ -168,6 +173,7 @@
 
   // Mouse move handler
   function handleMouseMove(e) {
+    if (isPicking) return;
     const x = e.clientX;
     const y = e.clientY;
     
@@ -197,17 +203,53 @@
   }
 
   // Click handler
-  function handleClick(e) {
+  async function handleClick(e) {
     e.preventDefault();
     e.stopPropagation();
 
-    // Re-sample on click for accuracy.
-    currentColor = getColorAtPosition(e.clientX, e.clientY);
+    if (isPicking) return;
+    isPicking = true;
+
     // #region agent log (debug-mode)
-    dbg('H6', 'Chrome Extension Colored-In/content/color-picker.js:CLICK', 'click picked color', {
-      color: currentColor,
+    dbg('H8', 'Chrome Extension Colored-In/content/color-picker.js:CLICK_ENTRY', 'click - attempt EyeDropper', {
+      hasEyeDropper: 'EyeDropper' in window,
     });
     // #endregion
+
+    // IMPORTANT: disable our overlay from intercepting while EyeDropper is active.
+    overlay.style.pointerEvents = 'none';
+    magnifier.style.display = 'none';
+    colorPreview.style.display = 'none';
+
+    // Pixel-accurate pick on click (user gesture) if available.
+    if ('EyeDropper' in window) {
+      try {
+        const eyeDropper = new EyeDropper();
+        const result = await eyeDropper.open();
+        currentColor = String(result?.sRGBHex || '').toUpperCase();
+        // #region agent log (debug-mode)
+        dbg('H8', 'Chrome Extension Colored-In/content/color-picker.js:EYEDROPPER_OK', 'EyeDropper returned', {
+          color: currentColor,
+        });
+        // #endregion
+      } catch (error) {
+        // #region agent log (debug-mode)
+        dbg('H8', 'Chrome Extension Colored-In/content/color-picker.js:EYEDROPPER_ERR', 'EyeDropper failed/cancelled', {
+          message: typeof error?.message === 'string' ? error.message.slice(0, 120) : String(error),
+        });
+        // #endregion
+      }
+    }
+
+    // Fallback heuristic if EyeDropper unavailable/cancelled.
+    if (!currentColor || typeof currentColor !== 'string' || !currentColor.startsWith('#')) {
+      currentColor = getColorAtPosition(e.clientX, e.clientY);
+      // #region agent log (debug-mode)
+      dbg('H6', 'Chrome Extension Colored-In/content/color-picker.js:CLICK', 'click picked color (fallback)', {
+        color: currentColor,
+      });
+      // #endregion
+    }
     
     if (currentColor) {
       // Copy to clipboard
@@ -308,6 +350,7 @@
     document.removeEventListener('click', handleClick, true);
     document.removeEventListener('keydown', handleKeyDown);
     window.__coloredInPickerActive = false;
+    isPicking = false;
   }
 
   // Add event listeners

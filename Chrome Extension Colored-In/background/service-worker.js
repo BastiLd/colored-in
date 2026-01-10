@@ -3,7 +3,7 @@
 
 const DEBUG_ENDPOINT = 'http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa';
 const DEBUG_SESSION_ID = 'debug-session';
-const DEBUG_RUN_ID = 'color-picker-overlay-fix1';
+const DEBUG_RUN_ID = 'color-picker-overlay-fix2';
 
 function dbg(hypothesisId, location, message, data) {
   try {
