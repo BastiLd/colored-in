@@ -8,6 +8,25 @@
   }
   window.__coloredInPickerActive = true;
 
+  // #region agent log (debug-mode)
+  function dbg(hypothesisId, location, message, data) {
+    try {
+      chrome.runtime.sendMessage({
+        action: 'debugLog',
+        hypothesisId,
+        location,
+        message,
+        data,
+      });
+    } catch {
+      // ignore
+    }
+  }
+  dbg('H6', 'Chrome Extension Colored-In/content/color-picker.js:INIT', 'overlay picker injected', {
+    hrefPrefix: typeof location?.href === 'string' ? location.href.slice(0, 40) : null,
+  });
+  // #endregion
+
   // Create overlay element
   const overlay = document.createElement('div');
   overlay.id = 'colored-in-picker-overlay';
@@ -72,19 +91,35 @@
 
   // Function to get color at position
   function getColorAtPosition(x, y) {
-    // Create a new canvas to capture the screen
-    const captureCanvas = document.createElement('canvas');
-    captureCanvas.width = window.innerWidth;
-    captureCanvas.height = window.innerHeight;
-    const captureCtx = captureCanvas.getContext('2d');
-    
-    // We can't directly capture the screen in content scripts
-    // So we'll use a workaround - get the computed background color of elements
-    const element = document.elementFromPoint(x, y);
+    // We can't directly capture the screen in content scripts.
+    // Workaround: sample computed backgroundColor of the *underlying* element.
+    // Important: our overlay sits on top, so elementFromPoint() would return the overlay.
+    const elements = document.elementsFromPoint(x, y);
+    const element = elements.find((el) => {
+      if (!(el instanceof Element)) return false;
+      const id = el.id || '';
+      return (
+        id !== 'colored-in-picker-overlay' &&
+        id !== 'colored-in-magnifier' &&
+        id !== 'colored-in-color-preview'
+      );
+    });
     
     if (element) {
       const computedStyle = window.getComputedStyle(element);
       let color = computedStyle.backgroundColor;
+
+      // #region agent log (debug-mode)
+      dbg('H6', 'Chrome Extension Colored-In/content/color-picker.js:SAMPLE', 'sample element', {
+        tag: element.tagName,
+        id: element.id || null,
+        cls: typeof element.className === 'string' ? element.className.slice(0, 60) : null,
+        bg: typeof color === 'string' ? color.slice(0, 40) : null,
+        elementsTop3: elements
+          .slice(0, 3)
+          .map((el) => (el && el instanceof Element ? `${el.tagName}${el.id ? `#${el.id}` : ''}` : String(el))),
+      });
+      // #endregion
       
       // If transparent, try to get from parent or use white
       if (color === 'rgba(0, 0, 0, 0)' || color === 'transparent') {
@@ -103,6 +138,14 @@
       
       return rgbToHex(color);
     }
+
+    // #region agent log (debug-mode)
+    dbg('H7', 'Chrome Extension Colored-In/content/color-picker.js:SAMPLE_NONE', 'no underlying element found', {
+      x,
+      y,
+      elementsCount: Array.isArray(elements) ? elements.length : null,
+    });
+    // #endregion
     
     return '#FFFFFF';
   }
@@ -157,6 +200,14 @@
   function handleClick(e) {
     e.preventDefault();
     e.stopPropagation();
+
+    // Re-sample on click for accuracy.
+    currentColor = getColorAtPosition(e.clientX, e.clientY);
+    // #region agent log (debug-mode)
+    dbg('H6', 'Chrome Extension Colored-In/content/color-picker.js:CLICK', 'click picked color', {
+      color: currentColor,
+    });
+    // #endregion
     
     if (currentColor) {
       // Copy to clipboard

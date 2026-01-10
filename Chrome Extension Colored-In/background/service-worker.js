@@ -3,7 +3,7 @@
 
 const DEBUG_ENDPOINT = 'http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa';
 const DEBUG_SESSION_ID = 'debug-session';
-const DEBUG_RUN_ID = 'color-picker-pre-fix';
+const DEBUG_RUN_ID = 'color-picker-overlay-fix1';
 
 function dbg(hypothesisId, location, message, data) {
   try {
@@ -175,6 +175,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
+
+  // #region agent log (debug-mode)
+  if (message.action === 'debugLog') {
+    dbg(
+      typeof message.hypothesisId === 'string' ? message.hypothesisId : 'H?',
+      typeof message.location === 'string' ? message.location : 'unknown',
+      typeof message.message === 'string' ? message.message : 'debug',
+      typeof message.data === 'object' && message.data ? message.data : {}
+    );
+    sendResponse({ success: true });
+    return true;
+  }
+  // #endregion
 });
 
 // Handle extension icon click (optional - popup handles this)
