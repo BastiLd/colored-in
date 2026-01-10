@@ -10,6 +10,13 @@
 6. Füge ihn in den Editor ein
 7. Klicke: **Deploy**
 
+### Zusätzlich (wichtig): `analyze-asset`
+8. Erstelle/öffne auch die Function: `analyze-asset`
+9. Kopiere den Code aus: `supabase/functions/analyze-asset/index.ts`
+10. Deployen
+
+> Hinweis: Beide Functions enthalten jetzt eine robustere Plan-Erkennung (z.B. "Ultra Plan" → `ultra`) und `analyze-asset` speichert erzeugte Paletten in `public_palettes`, damit sie im Dashboard erscheinen.
+
 ### Environment Variables setzen:
 - Gehe zu: **Settings** → **Edge Functions** → **Secrets**
 - Füge hinzu:
@@ -39,6 +46,7 @@ supabase link --project-ref gevqwporirhaekapftib
 ### Edge Function deployen:
 ```powershell
 supabase functions deploy generate-palette
+supabase functions deploy analyze-asset
 ```
 
 ### Secrets setzen:
