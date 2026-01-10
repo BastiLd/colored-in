@@ -1,12 +1,134 @@
 // Supabase client for Chrome Extension
-const SUPABASE_URL = 'https://gevqwporirhaekapftib.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdldnF3cG9yaXJoYWVrYXBmdGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUxMjM3MzEsImV4cCI6MjA1MDY5OTczMX0.aP07NmSbwZRmgf2xyOVG9XVe7WByPi-OuJeu2vpjKKI';
+let SUPABASE_URL = 'https://gevqwporirhaekapftib.supabase.co';
+let SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdldnF3cG9yaXJoYWVrYXBmdGliIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzUxMjM3MzEsImV4cCI6MjA1MDY5OTczMX0.aP07NmSbwZRmgf2xyOVG9XVe7WByPi-OuJeu2vpjKKI';
+
+// The extension can fetch the latest public anon key from the deployed web app.
+// This avoids hardcoding a key that can become invalid if the project's JWT secret is rotated.
+const REMOTE_SUPABASE_CONFIG_URL = 'https://bastild.github.io/colored-in/supabase-config.json';
+let remoteConfigLoaded = false;
+let remoteConfigLoadPromise = null;
+
+async function loadRemoteSupabaseConfig() {
+  try {
+    const res = await fetch(REMOTE_SUPABASE_CONFIG_URL, { cache: 'no-store' });
+    if (!res.ok) {
+      // #region agent log (debug-mode)
+      try {
+        fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'pre-fix',
+            hypothesisId: 'H4',
+            location: 'Chrome Extension Colored-In/lib/supabase.js:loadRemoteSupabaseConfig:HTTP_ERROR',
+            message: 'Remote supabase-config.json fetch failed',
+            data: { status: res.status },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      } catch {}
+      // #endregion
+      return;
+    }
+    const cfg = await res.json();
+    const nextUrl = typeof cfg?.url === 'string' ? cfg.url.trim() : '';
+    const nextKey = typeof cfg?.anonKey === 'string' ? cfg.anonKey.trim() : '';
+
+    if (nextUrl && nextKey && nextKey.length > 50) {
+      SUPABASE_URL = nextUrl;
+      SUPABASE_ANON_KEY = nextKey;
+      remoteConfigLoaded = true;
+    }
+
+    // #region agent log (debug-mode)
+    try {
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H4',
+          location: 'Chrome Extension Colored-In/lib/supabase.js:loadRemoteSupabaseConfig:SUCCESS',
+          message: 'Remote supabase-config.json loaded',
+          data: {
+            remoteConfigLoaded,
+            urlHost: (() => {
+              try { return nextUrl ? new URL(nextUrl).host : null; } catch { return null; }
+            })(),
+            keyLen: nextKey?.length ?? 0,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {}
+    // #endregion
+  } catch {
+    // #region agent log (debug-mode)
+    try {
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H4',
+          location: 'Chrome Extension Colored-In/lib/supabase.js:loadRemoteSupabaseConfig:NETWORK_ERROR',
+          message: 'Remote supabase-config.json fetch errored',
+          data: {},
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {}
+    // #endregion
+  }
+}
+
+function ensureRemoteSupabaseConfig() {
+  if (remoteConfigLoadPromise) return remoteConfigLoadPromise;
+  remoteConfigLoadPromise = loadRemoteSupabaseConfig();
+  return remoteConfigLoadPromise;
+}
+
+// #region agent log (debug-mode)
+try {
+  fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'debug-session',
+      runId: 'pre-fix',
+      hypothesisId: 'H3',
+      location: 'Chrome Extension Colored-In/lib/supabase.js:SUPABASE_CONFIG',
+      message: 'Supabase config snapshot (extension)',
+      data: {
+        urlHost: (() => {
+          try { return new URL(SUPABASE_URL).host; } catch { return null; }
+        })(),
+        keyPresent: Boolean(SUPABASE_ANON_KEY),
+        keyLen: SUPABASE_ANON_KEY?.length ?? 0,
+        keyLooksJwt: typeof SUPABASE_ANON_KEY === 'string' ? SUPABASE_ANON_KEY.startsWith('eyJ') : false,
+      },
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+} catch {
+  // ignore
+}
+// #endregion
 
 // Simple Supabase client for extension
 const SupabaseClient = {
   url: SUPABASE_URL,
   key: SUPABASE_ANON_KEY,
   accessToken: null,
+  ensureConfig: async function () {
+    await ensureRemoteSupabaseConfig();
+    // sync any newly loaded config onto the client object
+    this.url = SUPABASE_URL;
+    this.key = SUPABASE_ANON_KEY;
+  },
 
   // Set access token after login
   setAccessToken(token) {
@@ -27,6 +149,36 @@ const SupabaseClient = {
 
   // Login with email and password
   async signIn(email, password) {
+    await this.ensureConfig();
+
+    // #region agent log (debug-mode)
+    try {
+      fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'pre-fix',
+          hypothesisId: 'H3',
+          location: 'Chrome Extension Colored-In/lib/supabase.js:signIn:ENTRY',
+          message: 'Extension signIn called',
+          data: {
+            hasAt: typeof email === 'string' ? email.includes('@') : false,
+            emailLen: typeof email === 'string' ? email.length : 0,
+            urlHost: (() => {
+              try { return this.url ? new URL(this.url).host : null; } catch { return null; }
+            })(),
+            keyLen: typeof this.key === 'string' ? this.key.length : 0,
+            remoteConfigLoaded,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+    } catch {
+      // ignore
+    }
+    // #endregion
+
     const response = await fetch(`${this.url}/auth/v1/token?grant_type=password`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -35,6 +187,31 @@ const SupabaseClient = {
 
     if (!response.ok) {
       const error = await response.json();
+      // #region agent log (debug-mode)
+      try {
+        fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'pre-fix',
+            hypothesisId: 'H3',
+            location: 'Chrome Extension Colored-In/lib/supabase.js:signIn:ERROR',
+            message: 'Extension signIn failed',
+            data: {
+              status: response.status,
+              errorCode: error?.error ?? null,
+              hasErrorDescription: Boolean(error?.error_description),
+              hasMessage: Boolean(error?.message),
+              messageSnippet: typeof error?.message === 'string' ? error.message.slice(0, 60) : null,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+      } catch {
+        // ignore
+      }
+      // #endregion
       throw new Error(error.error_description || error.message || 'Login failed');
     }
 
@@ -171,3 +348,6 @@ const SupabaseClient = {
 
 // Export for use in popup
 window.SupabaseClient = SupabaseClient;
+
+// Start loading remote config early (best-effort)
+ensureRemoteSupabaseConfig().catch(() => {});
