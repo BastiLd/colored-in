@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getStoragePathFromUrl, USER_ASSETS_BUCKET } from "@/lib/storage";
 import { getPlanLimits } from "@/lib/planLimits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ interface Asset {
   url: string;
   filename: string | null;
   created_at: string;
+  displayUrl?: string | null;
 }
 
 interface AssetsPanelProps {
@@ -40,6 +42,32 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
     fetchAssets();
   }, [userId]);
 
+  const resolveAssetUrls = async (items: Asset[]) => {
+    const resolved = await Promise.all(
+      items.map(async (asset) => {
+        if (asset.type !== "image") return asset;
+        if (asset.url.startsWith("data:") || asset.url.startsWith("blob:")) {
+          return { ...asset, displayUrl: asset.url };
+        }
+        if (asset.url.includes("/storage/v1/object/sign/")) {
+          return { ...asset, displayUrl: asset.url };
+        }
+        const path = getStoragePathFromUrl(asset.url);
+        if (!path) {
+          return { ...asset, displayUrl: asset.url };
+        }
+        const { data, error } = await supabase.storage
+          .from(USER_ASSETS_BUCKET)
+          .createSignedUrl(path, 60 * 60);
+        if (error || !data?.signedUrl) {
+          return { ...asset, displayUrl: asset.url };
+        }
+        return { ...asset, displayUrl: data.signedUrl };
+      })
+    );
+    setAssets(resolved);
+  };
+
   const fetchAssets = async () => {
     const { data, error } = await supabase
       .from("user_assets")
@@ -48,7 +76,7 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setAssets(data as Asset[]);
+      await resolveAssetUrls(data as Asset[]);
     }
     setLoading(false);
   };
@@ -80,14 +108,10 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
       return;
     }
 
-    const { data: { publicUrl } } = supabase.storage
-      .from("user-assets")
-      .getPublicUrl(filePath);
-
     const { error: dbError } = await supabase.from("user_assets").insert({
       user_id: userId,
       type: "image",
-      url: publicUrl,
+      url: filePath,
       filename: file.name,
     });
 
@@ -140,8 +164,10 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
 
   const handleDelete = async (assetId: string, assetUrl: string, type: string) => {
     if (type === "image") {
-      const path = assetUrl.split("/").slice(-2).join("/");
-      await supabase.storage.from("user-assets").remove([path]);
+      const path = getStoragePathFromUrl(assetUrl);
+      if (path) {
+        await supabase.storage.from(USER_ASSETS_BUCKET).remove([path]);
+      }
     }
 
     const { error } = await supabase
@@ -158,6 +184,26 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
     }
   };
 
+  const getAnalysisUrl = async (asset: Asset) => {
+    if (asset.displayUrl && asset.displayUrl !== asset.url) {
+      return asset.displayUrl;
+    }
+    if (asset.type !== "image") {
+      return asset.url;
+    }
+    const path = getStoragePathFromUrl(asset.url);
+    if (!path) {
+      return asset.displayUrl || asset.url;
+    }
+    const { data, error } = await supabase.storage
+      .from(USER_ASSETS_BUCKET)
+      .createSignedUrl(path, 60 * 60);
+    if (error || !data?.signedUrl) {
+      return asset.displayUrl || asset.url;
+    }
+    return data.signedUrl;
+  };
+
   const handleAnalyze = async (asset: Asset) => {
     if (!isPaidPlan) {
       toast.error("Asset analysis requires a paid plan. Upgrade to Pro!");
@@ -167,10 +213,11 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
     setAnalyzingAssetId(asset.id);
     
     try {
-      const { data, error } = await supabase.functions.invoke('analyze-asset', {
+      const analysisUrl = await getAnalysisUrl(asset);
+        const { data, error } = await supabase.functions.invoke('analyze-asset', {
         body: {
           assetType: asset.type,
-          assetUrl: asset.url,
+          assetUrl: analysisUrl,
         }
       });
 
@@ -264,80 +311,78 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
         </Button>
       </div>
 
-      {/* Images Grid - Horizontal scroll when space is limited */}
+      {/* Images Grid - Responsive layout */}
       {imageAssets.length > 0 && (
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground mb-2">Your Images</p>
-          <div className="overflow-x-auto pb-2">
-            <div className="flex gap-2 min-w-max">
-              {imageAssets.map((asset) => {
-                const isSelected = selectedAssetId === asset.id;
-                const isAnalyzing = analyzingAssetId === asset.id;
-                
-                return (
-                  <div
-                    key={asset.id}
-                    className={`relative group rounded-lg overflow-hidden border-2 transition-all cursor-pointer flex-shrink-0 w-24 h-24 ${
-                      isSelected 
-                        ? "border-primary ring-2 ring-primary/30" 
-                        : "border-border hover:border-primary/50"
-                    }`}
-                    onClick={() => handleSelectAsset(asset.id)}
-                  >
-                    <img 
-                      src={asset.url} 
-                      alt={asset.filename || ""} 
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.onerror = null;
-                        target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
-                      }}
-                    />
-                    
-                    {/* Selection indicator */}
-                    {isSelected && (
-                      <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                        <Check className="w-3 h-3 text-primary-foreground" />
-                      </div>
-                    )}
-                    
-                    {/* Overlay with actions */}
-                    <div className={`absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1 transition-opacity ${
-                      isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                    }`}>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAnalyze(asset);
-                        }}
-                        disabled={isAnalyzing}
-                        className="text-xs h-7 px-2"
-                      >
-                        {isAnalyzing ? (
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                        ) : (
-                          <Sparkles className="w-3 h-3" />
-                        )}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(asset.id, asset.url, asset.type);
-                        }}
-                        className="text-xs h-7 px-2"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+          <div className="grid gap-2 grid-cols-[repeat(auto-fit,minmax(96px,1fr))]">
+            {imageAssets.map((asset) => {
+              const isSelected = selectedAssetId === asset.id;
+              const isAnalyzing = analyzingAssetId === asset.id;
+              
+              return (
+                <div
+                  key={asset.id}
+                  className={`relative group rounded-lg overflow-hidden border-2 transition-all cursor-pointer aspect-square ${
+                    isSelected 
+                      ? "border-primary ring-2 ring-primary/30" 
+                      : "border-border hover:border-primary/50"
+                  }`}
+                  onClick={() => handleSelectAsset(asset.id)}
+                >
+                  <img 
+                    src={asset.displayUrl || asset.url} 
+                    alt={asset.filename || ""} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.onerror = null;
+                      target.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                    }}
+                  />
+                  
+                  {/* Selection indicator */}
+                  {isSelected && (
+                    <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                      <Check className="w-3 h-3 text-primary-foreground" />
                     </div>
+                  )}
+                  
+                  {/* Overlay with actions */}
+                  <div className={`absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1 transition-opacity ${
+                    isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  }`}>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAnalyze(asset);
+                      }}
+                      disabled={isAnalyzing}
+                      className="text-xs h-7 px-2"
+                    >
+                      {isAnalyzing ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3 h-3" />
+                      )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(asset.id, asset.url, asset.type);
+                      }}
+                      className="text-xs h-7 px-2"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -353,7 +398,7 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
         <p className="text-xs text-muted-foreground mb-3">
           {linkAssets.length} / {planLimits.maxLinks === Infinity ? "∞" : planLimits.maxLinks} links
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2">
           <Input
             value={linkInput}
             onChange={(e) => setLinkInput(e.target.value)}
@@ -369,9 +414,10 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
           <Button
             onClick={handleAddLink}
             disabled={linkAssets.length >= planLimits.maxLinks || !linkInput.trim()}
-            size="icon"
+            className="w-full"
           >
-            <LinkIcon className="w-4 h-4" />
+            <LinkIcon className="w-4 h-4 mr-2" />
+            Add Link
           </Button>
         </div>
       </div>

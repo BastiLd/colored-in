@@ -70,6 +70,49 @@ const SupabaseClient = {
     return headers;
   },
 
+  getStoragePathFromUrl: function (assetUrl) {
+    if (!assetUrl) return null;
+    if (assetUrl.startsWith('data:') || assetUrl.startsWith('blob:')) {
+      return null;
+    }
+    if (!assetUrl.startsWith('http') && assetUrl.includes('/')) {
+      return assetUrl;
+    }
+    try {
+      const parsed = new URL(assetUrl);
+      const match = parsed.pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/[^/]+\/(.+)$/);
+      if (match && match[1]) {
+        return decodeURIComponent(match[1]);
+      }
+    } catch {
+      return null;
+    }
+    return null;
+  },
+
+  async createSignedUrl(bucket, path, expiresIn = 3600) {
+    await this.ensureConfig();
+    if (!path) return null;
+    const response = await fetch(`${this.url}/storage/v1/object/sign/${bucket}/${encodeURIComponent(path)}`, {
+      method: 'POST',
+      headers: {
+        ...this.getHeaders(true),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    const signedUrl = data?.signedUrl || data?.signedURL || data?.signed_url;
+    if (!signedUrl) return null;
+    if (signedUrl.startsWith('http')) return signedUrl;
+    return `${this.url}${signedUrl.startsWith('/') ? '' : '/'}${signedUrl}`;
+  },
+
   // Login with email and password
   async signIn(email, password) {
     await this.ensureConfig();
@@ -185,6 +228,23 @@ const SupabaseClient = {
     return await response.json();
   },
 
+  // Get user palettes
+  async getUserPalettes(userId) {
+    await this.ensureConfig();
+    const response = await fetch(
+      `${this.url}/rest/v1/public_palettes?created_by=eq.${userId}&select=id,name,colors,tags,description,color_descriptions&order=created_at.desc`,
+      {
+        headers: this.getHeaders(true),
+      }
+    );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    return await response.json();
+  },
+
   // Save a link or image asset record
   async createUserAsset(payload) {
     await this.ensureConfig();
@@ -212,7 +272,7 @@ const SupabaseClient = {
     return data?.[0] || null;
   },
 
-  // Upload an image to Storage and return its public URL
+  // Upload an image to Storage and return its path + signed URL
   async uploadUserAssetImage(userId, file) {
     await this.ensureConfig();
     if (!file || !file.name) throw new Error('Missing file');
@@ -238,8 +298,8 @@ const SupabaseClient = {
       throw new Error(text || 'Failed to upload image');
     }
 
-    const publicUrl = `${this.url}/storage/v1/object/public/${bucket}/${path}`;
-    return { publicUrl, bucket, path, filename: file.name };
+    const signedUrl = await this.createSignedUrl(bucket, path, 60 * 60);
+    return { signedUrl, bucket, path, filename: file.name };
   },
 
   // Call Edge Function: generate-palette

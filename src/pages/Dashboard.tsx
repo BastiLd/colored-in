@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { getStoragePathFromUrl, USER_ASSETS_BUCKET } from "@/lib/storage";
 import { User } from "@supabase/supabase-js";
 import { Home, Compass, Palette, Copy, Trash2, Sparkles, Upload, Link as LinkIcon, ExternalLink, Loader2, Image } from "lucide-react";
 import { PaletteBrowser } from "@/components/PaletteBrowser";
@@ -10,6 +11,7 @@ import { DashboardSidebar } from "@/components/DashboardSidebar";
 import { UsageContent } from "@/components/UsageContent";
 import { PlanContent } from "@/components/PlanContent";
 import { AIPaletteGenerator } from "@/components/AIPaletteGenerator";
+import { PaletteDetailModal } from "@/components/PaletteDetailModal";
 import { getPlanLimits } from "@/lib/planLimits";
 import { toast } from "sonner";
 
@@ -27,6 +29,8 @@ interface SavedPalette {
   colors: string[];
   tags: string[];
   created_at: string;
+  description?: string | null;
+  color_descriptions?: string[] | null;
 }
 
 interface UserAsset {
@@ -35,6 +39,7 @@ interface UserAsset {
   url: string;
   filename: string | null;
   created_at: string;
+  displayUrl?: string | null;
 }
 
 const Dashboard = () => {
@@ -52,6 +57,7 @@ const Dashboard = () => {
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [userAssets, setUserAssets] = useState<UserAsset[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(false);
+  const [selectedPalette, setSelectedPalette] = useState<SavedPalette | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -132,6 +138,32 @@ const Dashboard = () => {
     }
   };
 
+  const resolveAssetUrls = async (items: UserAsset[]) => {
+    const resolved = await Promise.all(
+      items.map(async (asset) => {
+        if (asset.type !== "image") return asset;
+        if (asset.url.startsWith("data:") || asset.url.startsWith("blob:")) {
+          return { ...asset, displayUrl: asset.url };
+        }
+        if (asset.url.includes("/storage/v1/object/sign/")) {
+          return { ...asset, displayUrl: asset.url };
+        }
+        const path = getStoragePathFromUrl(asset.url);
+        if (!path) {
+          return { ...asset, displayUrl: asset.url };
+        }
+        const { data, error } = await supabase.storage
+          .from(USER_ASSETS_BUCKET)
+          .createSignedUrl(path, 60 * 60);
+        if (error || !data?.signedUrl) {
+          return { ...asset, displayUrl: asset.url };
+        }
+        return { ...asset, displayUrl: data.signedUrl };
+      })
+    );
+    setUserAssets(resolved);
+  };
+
   const fetchUserAssets = async (userId: string) => {
     setLoadingAssets(true);
     try {
@@ -142,7 +174,7 @@ const Dashboard = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setUserAssets((data as UserAsset[]) || []);
+      await resolveAssetUrls((data as UserAsset[]) || []);
     } catch (error) {
       console.error("Error fetching user assets:", error);
       toast.error("Failed to load uploads");
@@ -155,8 +187,10 @@ const Dashboard = () => {
     try {
       // Delete from storage if it's an image
       if (type === "image") {
-        const path = assetUrl.split("/").slice(-2).join("/");
-        await supabase.storage.from("user-assets").remove([path]);
+        const path = getStoragePathFromUrl(assetUrl);
+        if (path) {
+          await supabase.storage.from(USER_ASSETS_BUCKET).remove([path]);
+        }
       }
 
       // Delete from database
@@ -180,7 +214,7 @@ const Dashboard = () => {
     try {
       const { data, error } = await supabase
         .from("public_palettes")
-        .select("id, name, colors, tags, created_at")
+        .select("id, name, colors, tags, created_at, description, color_descriptions")
         .eq("created_by", userId)
         .order("created_at", { ascending: false });
 
@@ -436,7 +470,13 @@ const Dashboard = () => {
                         <div key={i} className="flex-1" style={{ backgroundColor: color }} />
                       ))}
                     </div>
-                    <h3 className="font-medium mb-2 truncate">{palette.name}</h3>
+                    <button
+                      onClick={() => setSelectedPalette(palette)}
+                      className="font-medium mb-2 truncate text-left hover:text-primary transition-colors"
+                      title="View details"
+                    >
+                      {palette.name}
+                    </button>
                     <div className="flex gap-1 mb-3 flex-wrap">
                       {palette.tags.slice(0, 3).map((tag, i) => (
                         <span
@@ -515,7 +555,7 @@ const Dashboard = () => {
                         >
                           <div className="aspect-square">
                             <img 
-                              src={asset.url} 
+                              src={asset.displayUrl || asset.url} 
                               alt={asset.filename || "Uploaded image"} 
                               className="w-full h-full object-cover"
                             />
@@ -624,6 +664,18 @@ const Dashboard = () => {
         isOpen={showAIGenerator} 
         onClose={() => setShowAIGenerator(false)} 
       />
+
+      {selectedPalette && (
+        <PaletteDetailModal
+          palette={{
+            name: selectedPalette.name,
+            colors: selectedPalette.colors,
+            description: selectedPalette.description,
+            colorDescriptions: selectedPalette.color_descriptions,
+          }}
+          onClose={() => setSelectedPalette(null)}
+        />
+      )}
     </div>
   );
 };

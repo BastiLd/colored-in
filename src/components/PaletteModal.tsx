@@ -188,7 +188,7 @@ export function PaletteModal({ palette, onClose }: PaletteModalProps) {
         </div>
 
         {/* Color list */}
-        <div className="p-4 grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto">
           {palette.colors.map((color, i) => {
             const rgb = hexToRgb(color);
             return (
@@ -206,11 +206,22 @@ export function PaletteModal({ palette, onClose }: PaletteModalProps) {
                   <span className="font-mono text-xs text-muted-foreground">
                     rgb({rgb.r}, {rgb.g}, {rgb.b})
                   </span>
+                  {palette.colorDescriptions?.[i] && (
+                    <span className="text-xs text-muted-foreground mt-1">
+                      {palette.colorDescriptions[i]}
+                    </span>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
+        {palette.description && (
+          <div className="px-4 pb-4 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Description: </span>
+            {palette.description}
+          </div>
+        )}
       </div>
     </div>
   );

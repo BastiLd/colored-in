@@ -164,7 +164,7 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
       // Load user-created palettes from database
       const { data: userPalettes } = await supabase
         .from("public_palettes")
-        .select("id, name, colors, tags")
+        .select("id, name, colors, tags, description, color_descriptions")
         .order("created_at", { ascending: false });
 
       if (userPalettes) {
@@ -173,6 +173,8 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
           name: p.name,
           colors: p.colors,
           tags: p.tags,
+          description: p.description ?? undefined,
+          colorDescriptions: p.color_descriptions ?? undefined,
           isFree: true
         }));
       }

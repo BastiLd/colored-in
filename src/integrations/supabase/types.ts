@@ -38,24 +38,30 @@ export type Database = {
       public_palettes: {
         Row: {
           colors: string[]
+          color_descriptions: string[] | null
           created_at: string
           created_by: string | null
+          description: string | null
           id: string
           name: string
           tags: string[]
         }
         Insert: {
           colors: string[]
+          color_descriptions?: string[] | null
           created_at?: string
           created_by?: string | null
+          description?: string | null
           id?: string
           name: string
           tags?: string[]
         }
         Update: {
           colors?: string[]
+          color_descriptions?: string[] | null
           created_at?: string
           created_by?: string | null
+          description?: string | null
           id?: string
           name?: string
           tags?: string[]
@@ -102,22 +108,25 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          asset_type: "image" | "link"
-          asset_url: string
+          type: "image" | "link"
+          url: string
+          filename: string | null
           created_at: string
         }
         Insert: {
           id?: string
           user_id: string
-          asset_type: "image" | "link"
-          asset_url: string
+          type: "image" | "link"
+          url: string
+          filename?: string | null
           created_at?: string
         }
         Update: {
           id?: string
           user_id?: string
-          asset_type?: "image" | "link"
-          asset_url?: string
+          type?: "image" | "link"
+          url?: string
+          filename?: string | null
           created_at?: string
         }
         Relationships: []

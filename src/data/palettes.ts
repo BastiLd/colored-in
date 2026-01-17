@@ -4,6 +4,8 @@ export interface Palette {
   colors: string[];
   tags: string[];
   isFree: boolean;
+  description?: string;
+  colorDescriptions?: string[];
 }
 
 // HSL to Hex converter

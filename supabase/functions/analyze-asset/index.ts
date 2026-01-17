@@ -38,6 +38,24 @@ function normalizePlan(plan: unknown): 'free' | 'pro' | 'ultra' | 'individual' {
   return 'free';
 }
 
+function buildFallbackColorDescriptions(colors: string[]): string[] {
+  const roleTemplates = [
+    "This primary color anchors the palette and sets the visual tone.",
+    "This secondary color supports the primary and adds depth.",
+    "This accent color provides contrast and draws attention to key elements.",
+    "This background/neutral color improves readability and balance.",
+    "This highlight color adds subtle emphasis and polish.",
+    "This supporting color smooths transitions and keeps harmony.",
+    "This depth color adds richness without overpowering the design.",
+    "This soft contrast color keeps the palette versatile."
+  ];
+
+  return colors.map((color, index) => {
+    const template = roleTemplates[index] || roleTemplates[roleTemplates.length - 1];
+    return `${template} (${color})`;
+  });
+}
+
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -239,12 +257,14 @@ Deno.serve(async (req: Request) => {
         systemPrompt = `You are a color extraction expert. Analyze the image and extract ALL the dominant colors actually present in it. Extract between 2 and 10 colors depending on the image's color complexity.
 
 Return ONLY a valid JSON object in this exact format (no markdown, no explanation):
-{"colors":["#HEX1","#HEX2",...],"name":"Short descriptive name","description":"Brief description of the colors found"}
+{"colors":["#HEX1","#HEX2",...],"colorDescriptions":["Why this color appears and what it contributes", "..."],"name":"Short descriptive name","description":"Brief description of the colors found"}
 
 Rules:
 - Extract the ACTUAL colors present in the image
 - Use between 2 and 10 colors based on the image's color diversity
 - Use uppercase hex codes with # prefix
+- Provide ONE description per color (colorDescriptions length must match colors)
+- Each color description should mention where it appears and why it matters visually
 - Name should be 2-4 words describing what you see
 - Description should mention what the colors represent in the image`;
 
@@ -256,12 +276,14 @@ Rules:
         systemPrompt = `You are a web design color analyst. Analyze the website URL provided and determine what colors are likely used on that type of site. Extract between 2 and 10 colors.
 
 Return ONLY a valid JSON object in this exact format (no markdown, no explanation):
-{"colors":["#HEX1","#HEX2",...],"name":"Short descriptive name","description":"Brief description of the color scheme"}
+{"colors":["#HEX1","#HEX2",...],"colorDescriptions":["Why this color fits the site and what it improves", "..."],"name":"Short descriptive name","description":"Brief description of the color scheme"}
 
 Rules:
 - Predict the ACTUAL colors likely used on this type of website
 - Use between 2 and 10 colors based on typical usage
 - Use uppercase hex codes with # prefix
+- Provide ONE description per color (colorDescriptions length must match colors)
+- Each color description should explain role (primary, accent, background, text)
 - Consider the industry, brand type, and typical web design patterns
 - Name should describe the color scheme style`;
 
@@ -279,11 +301,13 @@ Rules:
 User's direction: "${userDescription}"
 
 Return ONLY a valid JSON object in this exact format (no markdown, no explanation):
-{"colors":["#HEX1","#HEX2","#HEX3","#HEX4","#HEX5","#HEX6"],"name":"Creative palette name","description":"How this palette combines the image with the user's vision"}
+{"colors":["#HEX1","#HEX2","#HEX3","#HEX4","#HEX5","#HEX6"],"colorDescriptions":["Why this color was chosen and what it improves", "..."],"name":"Creative palette name","description":"How this palette combines the image with the user's vision"}
 
 Rules:
 - Create 5-6 colors that blend the image's essence with the user's direction
 - Use uppercase hex codes with # prefix
+- Provide ONE description per color (colorDescriptions length must match colors)
+- Each color description should explain the role in the palette and the benefit
 - Be creative and interpret the user's vision
 - Name should be evocative and unique
 - Description should explain the creative choices`;
@@ -298,11 +322,13 @@ Rules:
 User's direction: "${userDescription}"
 
 Return ONLY a valid JSON object in this exact format (no markdown, no explanation):
-{"colors":["#HEX1","#HEX2","#HEX3","#HEX4","#HEX5","#HEX6"],"name":"Creative palette name","description":"How this palette combines the website theme with the user's vision"}
+{"colors":["#HEX1","#HEX2","#HEX3","#HEX4","#HEX5","#HEX6"],"colorDescriptions":["Why this color was chosen and what it improves", "..."],"name":"Creative palette name","description":"How this palette combines the website theme with the user's vision"}
 
 Rules:
 - Create 5-6 colors that blend the website's likely theme with the user's direction
 - Use uppercase hex codes with # prefix
+- Provide ONE description per color (colorDescriptions length must match colors)
+- Each color description should explain the role in the palette and the benefit
 - Be creative and interpret the user's vision
 - Name should be evocative and unique`;
 
@@ -463,8 +489,10 @@ Rules:
       mode: mode,
     };
 
-    // Include color descriptions for improve mode
-    if (mode === 'improve' && parsedPalette.colorDescriptions) {
+    const normalizedColors = response.colors as string[];
+    if (!Array.isArray(parsedPalette.colorDescriptions) || parsedPalette.colorDescriptions.length !== normalizedColors.length) {
+      response.colorDescriptions = buildFallbackColorDescriptions(normalizedColors);
+    } else {
       response.colorDescriptions = parsedPalette.colorDescriptions;
     }
 
@@ -482,6 +510,8 @@ Rules:
           name: String(response.name || 'Analyzed Palette'),
           colors: response.colors as string[],
           tags,
+          description: String(response.description || ''),
+          color_descriptions: response.colorDescriptions as string[],
           created_by: userData.id,
         });
 

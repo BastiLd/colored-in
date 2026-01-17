@@ -663,39 +663,39 @@ export function ProPaletteBuilder({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="grid grid-cols-3 gap-2 text-sm">
+        <div className="grid gap-2 text-sm grid-cols-[repeat(auto-fit,minmax(90px,1fr))]">
           <button
             onClick={() => setSidebarTab("palettes")}
-            className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
+            className={`rounded-lg px-3 py-2 flex items-center justify-center gap-2 transition-colors min-w-0 ${
               sidebarTab === "palettes" 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
             }`}
           >
             <PaletteIcon className="w-4 h-4" />
-            Palettes
+            <span className="truncate">Palettes</span>
           </button>
           <button
             onClick={() => setSidebarTab("colors")}
-            className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
+            className={`rounded-lg px-3 py-2 flex items-center justify-center gap-2 transition-colors min-w-0 ${
               sidebarTab === "colors" 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
             }`}
           >
             <Droplets className="w-4 h-4" />
-            Colors
+            <span className="truncate">Colors</span>
           </button>
           <button
             onClick={() => setSidebarTab("assets")}
-            className={`rounded-lg px-3 py-2 flex items-center gap-2 transition-colors ${
+            className={`rounded-lg px-3 py-2 flex items-center justify-center gap-2 transition-colors min-w-0 ${
               sidebarTab === "assets" 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
             }`}
           >
             <Image className="w-4 h-4" />
-            Assets
+            <span className="truncate">Assets</span>
           </button>
         </div>
       </div>

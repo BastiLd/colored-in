@@ -78,6 +78,24 @@ function validatePrompt(prompt: unknown): { valid: boolean; error?: string; sani
   return { valid: true, sanitized: trimmedPrompt };
 }
 
+function buildFallbackColorDescriptions(colors: string[]): string[] {
+  const roleTemplates = [
+    "This primary color anchors the palette with a strong base, improving recognition and visual hierarchy.",
+    "This secondary color supports the primary tone, adding depth and keeping the palette cohesive.",
+    "This accent color provides contrast and focus, making key actions and highlights stand out.",
+    "This background/neutral color creates breathing room and improves readability.",
+    "This highlight color adds subtle emphasis and polish for small UI details.",
+    "This supporting color balances the palette and smooths transitions between tones.",
+    "This depth color adds richness and dimensionality without overwhelming the design.",
+    "This soft contrast color keeps the palette versatile and easy to apply."
+  ];
+
+  return colors.map((color, index) => {
+    const template = roleTemplates[index] || roleTemplates[roleTemplates.length - 1];
+    return `${template} (${color})`;
+  });
+}
+
 // Global error handler to catch any unhandled errors
 if (typeof Deno !== 'undefined') {
   globalThis.addEventListener('error', (event) => {
@@ -329,17 +347,24 @@ Deno.serve((req) => {
           {
             role: 'system',
             content: `You are a color palette expert. When given a description, you create beautiful, harmonious color palettes.
-            
+
 IMPORTANT: Respond ONLY with a valid JSON object in this exact format:
 {
   "name": "Palette Name",
   "colors": ["#HEXCODE1", "#HEXCODE2", "#HEXCODE3", "#HEXCODE4", "#HEXCODE5"],
+  "colorDescriptions": [
+    "Why this color is included and what it improves",
+    "Why this color is included and what it improves"
+  ],
+  "description": "Overall explanation of how the palette works together",
   "tags": ["tag1", "tag2", "tag3"]
 }
 
 Rules:
 - Generate between 4-8 colors that work well together
 - All colors must be valid 6-digit hex codes starting with #
+- Provide ONE description per color (colorDescriptions length must match colors)
+- Each color description must explain why that color belongs and what it improves (contrast, hierarchy, mood, usability)
 - The name should be creative and match the mood
 - Include 2-4 relevant tags
 - Do not include any explanation or text outside the JSON`
@@ -350,7 +375,7 @@ Rules:
           }
         ],
         temperature: 0.8,
-        max_tokens: 300,
+        max_tokens: 600,
       }),
     });
 
@@ -391,6 +416,20 @@ Rules:
       return color.toUpperCase();
     });
 
+    if (!Array.isArray(palette.tags)) {
+      palette.tags = [];
+    }
+
+    // Ensure overall description exists
+    if (typeof palette.description !== 'string' || !palette.description.trim()) {
+      palette.description = 'A cohesive palette crafted to match the requested mood and improve visual hierarchy.';
+    }
+
+    // Ensure color descriptions exist and align
+    if (!Array.isArray(palette.colorDescriptions) || palette.colorDescriptions.length !== palette.colors.length) {
+      palette.colorDescriptions = buildFallbackColorDescriptions(palette.colors);
+    }
+
     console.log('Generated palette:', palette.name);
 
     // Save palette to public_palettes
@@ -400,6 +439,8 @@ Rules:
         name: palette.name,
         colors: palette.colors,
         tags: palette.tags || [],
+        description: palette.description || null,
+        color_descriptions: palette.colorDescriptions || [],
         created_by: user.id
       });
 

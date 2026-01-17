@@ -97,6 +97,72 @@
   }
 }
 
+/* Guided tour */
+.tour-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9998;
+}
+
+.tour-tooltip {
+  position: fixed;
+  max-width: 320px;
+  background: #111018;
+  color: #ffffff;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 12px;
+  padding: 12px 14px;
+  z-index: 10000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.tour-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.tour-description {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tour-skip {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tour-next {
+  background: #8b5cf6;
+  border: 1px solid #8b5cf6;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tour-highlight {
+  position: relative;
+  z-index: 10001;
+  box-shadow:
+    0 0 0 2px rgba(139, 92, 246, 0.9),
+    0 0 0 6px rgba(139, 92, 246, 0.25);
+  border-radius: 10px;
+}
+
 @layer utilities {
   .font-display {
     font-family: 'Space Grotesk', sans-serif;

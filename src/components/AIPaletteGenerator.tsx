@@ -23,6 +23,8 @@ interface GeneratedPalette {
   name: string;
   colors: string[];
   tags: string[];
+  description?: string;
+  colorDescriptions?: string[];
 }
 
 function getContrastColor(hex: string): string {
@@ -502,6 +504,32 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
                   </div>
                 ))}
               </div>
+
+              {generatedPalette.colorDescriptions?.length ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Why these colors work</p>
+                  <div className="space-y-2">
+                    {generatedPalette.colors.map((color, i) => (
+                      <div key={color + i} className="flex items-start gap-3 bg-muted/40 rounded-lg p-2">
+                        <div
+                          className="w-6 h-6 rounded-md flex-shrink-0"
+                          style={{ backgroundColor: color }}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-mono text-foreground">{color}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {generatedPalette.colorDescriptions?.[i] || "Color role explanation unavailable."}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {generatedPalette.description ? (
+                <p className="text-xs text-muted-foreground">{generatedPalette.description}</p>
+              ) : null}
 
               <div className="flex gap-2 flex-wrap">
                 {generatedPalette.tags.map((tag, i) => (

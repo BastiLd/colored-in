@@ -75,6 +75,24 @@
           </svg>
           <span>Analyze and Create</span>
         </button>
+        <button id="menu-assets" class="menu-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <path d="M21 15l-5-5L5 21"></path>
+          </svg>
+          <span>Assets</span>
+        </button>
+        <button id="menu-palettes" class="menu-item">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="13.5" cy="6.5" r="2.5"></circle>
+            <circle cx="19" cy="12" r="2"></circle>
+            <circle cx="9" cy="14" r="2"></circle>
+            <circle cx="4.5" cy="10.5" r="2.5"></circle>
+            <path d="M12 21a9 9 0 1 1 0-18"></path>
+          </svg>
+          <span>My Palettes</span>
+        </button>
       </nav>
       <div class="menu-footer">
         <button id="logout-btn" class="menu-item logout">
@@ -278,6 +296,38 @@
           <div id="analyze-results" class="analyze-results hidden"></div>
           
           <p id="analyze-error" class="error-message hidden"></p>
+        </div>
+      </div>
+
+      <!-- Assets View -->
+      <div id="assets-view" class="view hidden">
+        <div class="view-header">
+          <button id="assets-back-btn" class="back-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <h2>Assets</h2>
+        </div>
+        <div class="assets-content">
+          <div class="asset-section">
+            <div id="assets-list" class="assets-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Palettes View -->
+      <div id="palettes-view" class="view hidden">
+        <div class="view-header">
+          <button id="palettes-back-btn" class="back-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <h2>My Palettes</h2>
+        </div>
+        <div class="palettes-content">
+          <div id="palettes-list" class="palette-list"></div>
         </div>
       </div>
 

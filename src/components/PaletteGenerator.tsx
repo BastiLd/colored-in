@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Copy, Lock, Unlock, RefreshCw, ChevronRight, Save } from "lucide-react";
 import { toast } from "sonner";
 import { getRandomPalette, generateRandomColors } from "@/data/palettes";
 import { supabase } from "@/integrations/supabase/client";
+import { GuidedTour, type TourStep } from "@/components/GuidedTour";
 
 interface ColorSlot {
   color: string;
@@ -57,6 +58,40 @@ export function PaletteGenerator({ onBrowse, onHome, onNewDesign, showNewDesignB
 
   const lockedColors = colorSlots.filter(s => s.locked).map(s => s.color);
   const canSave = lockedColors.length >= 3;
+
+  const tourSteps = useMemo<TourStep[]>(
+    () => [
+      {
+        id: "palette",
+        selector: '[data-tour="free-palette"]',
+        title: "Palette canvas",
+        description: "Click any color to copy it. Lock colors you want to keep, then regenerate.",
+        placement: "bottom",
+      },
+      {
+        id: "save",
+        selector: '[data-tour="free-save"]',
+        title: "Save your palette",
+        description: "Lock at least 3 colors to save your palette to My Palettes.",
+        placement: "bottom",
+      },
+      {
+        id: "export",
+        selector: '[data-tour="free-export"]',
+        title: "Export colors",
+        description: "Copy all colors at once to use them in your designs.",
+        placement: "bottom",
+      },
+      {
+        id: "browse",
+        selector: '[data-tour="free-browse"]',
+        title: "Browse palettes",
+        description: "Explore curated palettes for inspiration and quick starts.",
+        placement: "bottom",
+      },
+    ],
+    []
+  );
 
   const savePalette = useCallback(async () => {
     if (!canSave) {
@@ -135,6 +170,7 @@ export function PaletteGenerator({ onBrowse, onHome, onNewDesign, showNewDesignB
           <button
             onClick={savePalette}
             disabled={!canSave}
+            data-tour="free-save"
             className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               canSave 
                 ? "text-primary-foreground bg-primary hover:opacity-90 glow-primary" 
@@ -148,6 +184,7 @@ export function PaletteGenerator({ onBrowse, onHome, onNewDesign, showNewDesignB
 
           <button
             onClick={copyAllColors}
+            data-tour="free-export"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary hover:bg-muted rounded-lg transition-colors"
           >
             <Copy className="w-4 h-4" />
@@ -156,6 +193,7 @@ export function PaletteGenerator({ onBrowse, onHome, onNewDesign, showNewDesignB
           
           <button
             onClick={onBrowse}
+            data-tour="free-browse"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all glow-primary"
           >
             Browse Palettes
@@ -165,7 +203,7 @@ export function PaletteGenerator({ onBrowse, onHome, onNewDesign, showNewDesignB
       </header>
 
       {/* Color Strips */}
-      <div className="flex-1 flex">
+      <div className="flex-1 flex" data-tour="free-palette">
         {colorSlots.map((slot, index) => (
           <div
             key={index}
@@ -232,6 +270,8 @@ export function PaletteGenerator({ onBrowse, onHome, onNewDesign, showNewDesignB
           <span className="ml-2 px-2 py-0.5 text-xs bg-primary-foreground/20 rounded">Space</span>
         </button>
       </footer>
+
+      <GuidedTour storageKey="tour-free-builder" steps={tourSteps} enabled />
     </div>
   );
 }

@@ -10,8 +10,10 @@ const state = {
   currentView: 'login',
   selectedAsset: null,
   selectedAssetType: null,
+  selectedAssetId: null,
   generatedPalettes: [],
   assets: [],
+  previousView: null,
 };
 
 // ============================================
@@ -32,6 +34,8 @@ const elements = {
   menuAI: document.getElementById('menu-ai'),
   menuManual: document.getElementById('menu-manual'),
   menuAnalyze: document.getElementById('menu-analyze'),
+  menuAssets: document.getElementById('menu-assets'),
+  menuPalettes: document.getElementById('menu-palettes'),
   logoutBtn: document.getElementById('logout-btn'),
 
   // Views
@@ -40,6 +44,8 @@ const elements = {
   mainView: document.getElementById('main-view'),
   aiView: document.getElementById('ai-view'),
   analyzeView: document.getElementById('analyze-view'),
+  assetsView: document.getElementById('assets-view'),
+  palettesView: document.getElementById('palettes-view'),
   detailView: document.getElementById('detail-view'),
 
   // Login
@@ -84,6 +90,14 @@ const elements = {
   analyzeResults: document.getElementById('analyze-results'),
   analyzeError: document.getElementById('analyze-error'),
 
+  // Assets View
+  assetsBackBtn: document.getElementById('assets-back-btn'),
+  assetsList: document.getElementById('assets-list'),
+
+  // My Palettes View
+  palettesBackBtn: document.getElementById('palettes-back-btn'),
+  palettesList: document.getElementById('palettes-list'),
+
   // Analyze Modal
   analyzeModal: document.getElementById('analyze-modal'),
   closeAnalyzeModal: document.getElementById('close-analyze-modal'),
@@ -124,6 +138,8 @@ function showView(viewName) {
   elements.mainView.classList.add('hidden');
   elements.aiView.classList.add('hidden');
   elements.analyzeView.classList.add('hidden');
+  elements.assetsView.classList.add('hidden');
+  elements.palettesView.classList.add('hidden');
   elements.detailView.classList.add('hidden');
 
   // Show requested view
@@ -390,62 +406,139 @@ function copyColor(color) {
 // ============================================
 // Analyze and Create
 // ============================================
-async function loadAssets() {
+async function loadAssets(targetList) {
   if (!state.user) return;
-  
-  elements.savedAssetsList.innerHTML = '<p class="loading-text">Loading assets...</p>';
+
+  const list = targetList || elements.savedAssetsList;
+  if (list) {
+    list.innerHTML = '<p class="loading-text">Loading assets...</p>';
+  }
   
   try {
     // Ensure remote config is loaded before making API calls
     await SupabaseClient.ensureConfig();
     const assets = await SupabaseClient.getUserAssets(state.user.id);
-    state.assets = assets;
-    renderAssets(assets);
+    const hydrated = await hydrateAssetsForDisplay(assets);
+    state.assets = hydrated;
+    renderAssets(hydrated, list);
+    return hydrated;
   } catch (error) {
     console.error('Failed to load assets:', error);
-    elements.savedAssetsList.innerHTML = '<p class="loading-text">Failed to load assets</p>';
+    if (list) {
+      list.innerHTML = '<p class="loading-text">Failed to load assets</p>';
+    }
+    return [];
   }
 }
 
-function renderAssets(assets) {
+async function hydrateAssetsForDisplay(assets) {
+  const bucket = 'user-assets';
+  const hydrated = await Promise.all(
+    assets.map(async (asset) => {
+      if (asset.type !== 'image') return asset;
+      if (asset.url?.includes('/storage/v1/object/sign/')) {
+        return { ...asset, displayUrl: asset.url };
+      }
+      const path = SupabaseClient.getStoragePathFromUrl(asset.url);
+      if (!path) {
+        return { ...asset, displayUrl: asset.url };
+      }
+      const signedUrl = await SupabaseClient.createSignedUrl(bucket, path, 60 * 60);
+      return { ...asset, displayUrl: signedUrl || asset.url };
+    })
+  );
+  return hydrated;
+}
+
+function renderAssets(assets, targetList) {
+  const list = targetList || elements.savedAssetsList;
+  if (!list) return;
   if (assets.length === 0) {
-    elements.savedAssetsList.innerHTML = '<p class="loading-text">No saved assets. Add a link or image!</p>';
+    list.innerHTML = '<p class="loading-text">No saved assets. Add a link or image!</p>';
     return;
   }
   
-  elements.savedAssetsList.innerHTML = '';
-  
-  assets.forEach(asset => {
-    const item = document.createElement('div');
-    item.className = 'asset-item';
-    item.dataset.id = asset.id;
-    item.dataset.type = asset.type;
-    item.dataset.url = asset.url;
-    
-    if (asset.type === 'image') {
-      const img = document.createElement('img');
-      img.src = asset.url;
-      img.alt = asset.filename || 'Image';
-      item.appendChild(img);
-    } else {
-      const iconDiv = document.createElement('div');
-      iconDiv.className = 'asset-icon';
-      iconDiv.innerHTML = `
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-        </svg>
-      `;
-      item.appendChild(iconDiv);
-    }
-    
-    const span = document.createElement('span');
-    span.textContent = asset.filename || asset.url;
-    item.appendChild(span);
-    
-    item.addEventListener('click', () => selectAsset(asset));
-    elements.savedAssetsList.appendChild(item);
-  });
+  list.innerHTML = '';
+
+  const images = assets.filter(asset => asset.type === 'image');
+  const links = assets.filter(asset => asset.type === 'link');
+
+  const renderGroup = (title, groupItems) => {
+    if (groupItems.length === 0) return;
+    const group = document.createElement('div');
+    group.className = 'asset-group';
+    const heading = document.createElement('div');
+    heading.className = 'asset-group-title';
+    heading.textContent = title;
+    group.appendChild(heading);
+
+    const groupList = document.createElement('div');
+    groupList.className = 'assets-list';
+
+    groupItems.forEach(asset => {
+      const item = document.createElement('div');
+      item.className = 'asset-item';
+      item.dataset.id = asset.id;
+      item.dataset.type = asset.type;
+      item.dataset.url = asset.displayUrl || asset.url;
+      
+      if (state.selectedAssetId && state.selectedAssetId === asset.id) {
+        item.classList.add('selected');
+      }
+
+      if (asset.type === 'image') {
+        const img = document.createElement('img');
+        img.src = asset.displayUrl || asset.url;
+        img.alt = asset.filename || 'Image';
+        item.appendChild(img);
+      } else {
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'asset-icon';
+        iconDiv.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+        `;
+        item.appendChild(iconDiv);
+      }
+      
+      const span = document.createElement('span');
+      span.textContent = asset.filename || asset.url;
+      item.appendChild(span);
+      
+      item.addEventListener('click', () => selectAsset(asset));
+      groupList.appendChild(item);
+    });
+
+    group.appendChild(groupList);
+    list.appendChild(group);
+  };
+
+  renderGroup('Images', images);
+  renderGroup('Links', links);
+}
+
+async function loadUserPalettes() {
+  if (!state.user) return;
+  if (!elements.palettesList) return;
+
+  elements.palettesList.innerHTML = '<p class="loading-text">Loading palettes...</p>';
+
+  try {
+    await SupabaseClient.ensureConfig();
+    const palettes = await SupabaseClient.getUserPalettes(state.user.id);
+    const normalized = palettes.map((palette) => ({
+      ...palette,
+      colorDescriptions: palette.color_descriptions || palette.colorDescriptions || [],
+    }));
+    renderPalettes(normalized, elements.palettesList);
+    return normalized;
+  } catch (error) {
+    console.error('Failed to load palettes:', error);
+    elements.palettesList.innerHTML = '<p class="loading-text">Failed to load palettes</p>';
+    return [];
+  }
 }
 
 function selectAsset(asset) {
@@ -458,14 +551,16 @@ function selectAsset(asset) {
     item.classList.add('selected');
   }
   
-  state.selectedAsset = asset.url;
+  state.selectedAsset = asset.type === 'image' ? (asset.displayUrl || asset.url) : asset.url;
   state.selectedAssetType = asset.type;
+  state.selectedAssetId = asset.id;
   
   // Show preview
   elements.selectedAssetPreview.classList.remove('hidden');
   
   if (asset.type === 'image') {
-    elements.assetPreviewContent.innerHTML = `<img src="${asset.url}" alt="Selected">`;
+    const previewUrl = asset.displayUrl || asset.url;
+    elements.assetPreviewContent.innerHTML = `<img src="${previewUrl}" alt="Selected">`;
   } else {
     elements.assetPreviewContent.innerHTML = `
       <div class="preview-link">
@@ -588,17 +683,20 @@ function handleImageSelect(event) {
       const created = await SupabaseClient.createUserAsset({
         user_id: state.user.id,
         type: 'image',
-        url: uploaded.publicUrl,
+        url: uploaded.path,
         filename: uploaded.filename || file.name,
       });
 
       // Use the stored URL for analysis so the asset is persistent
-      state.selectedAsset = uploaded.publicUrl;
+      state.selectedAsset = uploaded.signedUrl || dataUrl;
       state.selectedAssetType = 'image';
 
-      await loadAssets();
+      const hydrated = await loadAssets();
       if (created?.id) {
-        selectAsset(created);
+        const createdAsset = hydrated.find((asset) => asset.id === created.id);
+        if (createdAsset) {
+          selectAsset(createdAsset);
+        }
       }
 
       showToast('Image saved!', 'success');
@@ -729,6 +827,7 @@ function showPaletteDetail(palette) {
     elements.detailContent.appendChild(descDiv);
   }
   
+  state.previousView = state.currentView;
   showView('detail');
 }
 
@@ -766,6 +865,14 @@ function initEventListeners() {
     showView('analyze');
     loadAssets();
   });
+  elements.menuAssets.addEventListener('click', () => {
+    showView('assets');
+    loadAssets(elements.assetsList);
+  });
+  elements.menuPalettes.addEventListener('click', () => {
+    showView('palettes');
+    loadUserPalettes();
+  });
   elements.logoutBtn.addEventListener('click', logout);
 
   // Login
@@ -801,6 +908,8 @@ function initEventListeners() {
 
   // Analyze View
   elements.analyzeBackBtn.addEventListener('click', () => showView('main'));
+  elements.assetsBackBtn.addEventListener('click', () => showView('main'));
+  elements.palettesBackBtn.addEventListener('click', () => showView('main'));
   elements.tabSaved.addEventListener('click', () => {
     elements.tabSaved.classList.add('active');
     elements.tabNew.classList.remove('active');
@@ -844,7 +953,8 @@ function initEventListeners() {
   elements.detailBackBtn.addEventListener('click', () => {
     // Go back to the previous view (AI or Analyze)
     if (state.currentView === 'detail') {
-      showView('ai'); // Default to AI view
+      const backView = state.previousView || 'main';
+      showView(backView);
     }
   });
 
