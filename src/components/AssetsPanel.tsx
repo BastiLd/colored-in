@@ -279,12 +279,12 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
   }
 
   return (
-    <div className="space-y-4 min-w-0 overflow-hidden">
+    <div className="space-y-4 min-w-0 overflow-hidden flex flex-col h-full">
       {/* Upload Images Section */}
-      <div className="min-w-0">
-        <h3 className="font-semibold mb-2 flex items-center gap-2">
-          <Upload className="w-4 h-4" />
-          Upload Images
+      <div className="min-w-0 flex-shrink-0">
+        <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+          <Upload className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">Upload Images</span>
         </h3>
         <p className="text-xs text-muted-foreground mb-3">
           {imageAssets.length} / {planLimits.maxImages === Infinity ? "∞" : planLimits.maxImages} images
@@ -313,9 +313,10 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
 
       {/* Images Grid - Responsive layout */}
       {imageAssets.length > 0 && (
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Your Images</p>
-          <div className="grid gap-2 grid-cols-[repeat(auto-fit,minmax(96px,1fr))]">
+        <div className="min-w-0 flex-1 overflow-hidden flex flex-col">
+          <p className="text-xs font-medium text-muted-foreground mb-2 flex-shrink-0">Your Images</p>
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
             {imageAssets.map((asset) => {
               const isSelected = selectedAssetId === asset.id;
               const isAnalyzing = analyzingAssetId === asset.id;
@@ -383,17 +384,18 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
                 </div>
               );
             })}
-          </div>
+            </div>
+          </ScrollArea>
         </div>
       )}
 
-      <Separator />
+      <Separator className="flex-shrink-0" />
 
       {/* Add Links Section */}
-      <div>
-        <h3 className="font-semibold mb-2 flex items-center gap-2">
-          <LinkIcon className="w-4 h-4" />
-          Add Website Links
+      <div className="min-w-0 flex-shrink-0">
+        <h3 className="font-semibold mb-2 flex items-center gap-2 text-sm">
+          <LinkIcon className="w-4 h-4 flex-shrink-0" />
+          <span className="truncate">Add Website Links</span>
         </h3>
         <p className="text-xs text-muted-foreground mb-3">
           {linkAssets.length} / {planLimits.maxLinks === Infinity ? "∞" : planLimits.maxLinks} links
@@ -409,24 +411,26 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
                 handleAddLink();
               }
             }}
-            className="text-sm"
+            className="text-sm w-full min-w-0"
           />
           <Button
             onClick={handleAddLink}
             disabled={linkAssets.length >= planLimits.maxLinks || !linkInput.trim()}
-            className="w-full"
+            className="w-full min-w-0"
+            size="sm"
           >
-            <LinkIcon className="w-4 h-4 mr-2" />
-            Add Link
+            <LinkIcon className="w-4 h-4 mr-2 flex-shrink-0" />
+            <span className="truncate">Add Link</span>
           </Button>
         </div>
       </div>
 
       {/* Links List */}
       {linkAssets.length > 0 && (
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-muted-foreground mb-2">Your Links</p>
-          <div className="space-y-2">
+        <div className="min-w-0 flex-1 overflow-hidden flex flex-col">
+          <p className="text-xs font-medium text-muted-foreground mb-2 flex-shrink-0">Your Links</p>
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="space-y-2">
             {linkAssets.map((asset) => {
               const isSelected = selectedAssetId === asset.id;
               const isAnalyzing = analyzingAssetId === asset.id;
@@ -509,7 +513,8 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
                 </div>
               );
             })}
-          </div>
+            </div>
+          </ScrollArea>
         </div>
       )}
 

@@ -91,15 +91,39 @@ export default function Auth() {
     import.meta.env.DEV || new URLSearchParams(window.location.search).has("debug");
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
-        navigate("/");
+        // Check if user has a paid plan
+        const { data: subscriptionData } = await supabase
+          .from("user_subscriptions")
+          .select("plan, is_active")
+          .eq("user_id", session.user.id)
+          .single();
+        
+        const hasPaidPlan = subscriptionData?.is_active && subscriptionData?.plan !== "free";
+        if (hasPaidPlan) {
+          navigate("/dashboard");
+        } else {
+          navigate("/");
+        }
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
-        navigate("/");
+        // Check if user has a paid plan
+        const { data: subscriptionData } = await supabase
+          .from("user_subscriptions")
+          .select("plan, is_active")
+          .eq("user_id", session.user.id)
+          .single();
+        
+        const hasPaidPlan = subscriptionData?.is_active && subscriptionData?.plan !== "free";
+        if (hasPaidPlan) {
+          navigate("/dashboard");
+        } else {
+          navigate("/");
+        }
       }
     });
 
@@ -134,12 +158,28 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { error, data } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
         toast.success("Welcome back!");
+        
+        // Check if user has a paid plan
+        if (data.session?.user) {
+          const { data: subscriptionData } = await supabase
+            .from("user_subscriptions")
+            .select("plan, is_active")
+            .eq("user_id", data.session.user.id)
+            .single();
+          
+          const hasPaidPlan = subscriptionData?.is_active && subscriptionData?.plan !== "free";
+          if (hasPaidPlan) {
+            navigate("/dashboard");
+          } else {
+            navigate("/");
+          }
+        }
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -158,6 +198,7 @@ export default function Auth() {
           }
         } else if (data.session) {
           toast.success("Account created! You're signed in.");
+          // New users start on free plan, so go to homepage
           navigate("/");
         } else {
           // Email confirmation flow: user exists but no session yet.

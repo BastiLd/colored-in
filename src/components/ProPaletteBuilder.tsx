@@ -663,39 +663,39 @@ export function ProPaletteBuilder({
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
-        <div className="grid gap-2 text-sm grid-cols-[repeat(auto-fit,minmax(90px,1fr))]">
+        <div className="grid gap-2 text-sm grid-cols-3 w-full">
           <button
             onClick={() => setSidebarTab("palettes")}
-            className={`rounded-lg px-3 py-2 flex items-center justify-center gap-2 transition-colors min-w-0 ${
+            className={`rounded-lg px-2 py-2 flex items-center justify-center gap-1.5 transition-colors min-w-0 flex-1 ${
               sidebarTab === "palettes" 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
             }`}
           >
-            <PaletteIcon className="w-4 h-4" />
-            <span className="truncate">Palettes</span>
+            <PaletteIcon className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate text-xs">Palettes</span>
           </button>
           <button
             onClick={() => setSidebarTab("colors")}
-            className={`rounded-lg px-3 py-2 flex items-center justify-center gap-2 transition-colors min-w-0 ${
+            className={`rounded-lg px-2 py-2 flex items-center justify-center gap-1.5 transition-colors min-w-0 flex-1 ${
               sidebarTab === "colors" 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
             }`}
           >
-            <Droplets className="w-4 h-4" />
-            <span className="truncate">Colors</span>
+            <Droplets className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate text-xs">Colors</span>
           </button>
           <button
             onClick={() => setSidebarTab("assets")}
-            className={`rounded-lg px-3 py-2 flex items-center justify-center gap-2 transition-colors min-w-0 ${
+            className={`rounded-lg px-2 py-2 flex items-center justify-center gap-1.5 transition-colors min-w-0 flex-1 ${
               sidebarTab === "assets" 
                 ? "bg-primary text-primary-foreground" 
                 : "bg-muted/50 border border-border text-muted-foreground hover:bg-muted"
             }`}
           >
-            <Image className="w-4 h-4" />
-            <span className="truncate">Assets</span>
+            <Image className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate text-xs">Assets</span>
           </button>
         </div>
       </div>

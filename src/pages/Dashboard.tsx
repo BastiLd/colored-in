@@ -66,6 +66,18 @@ const Dashboard = () => {
       setCurrentView(initialView);
     }
 
+    // Check for checkout success
+    const checkoutStatus = params.get("checkout");
+    if (checkoutStatus === "success") {
+      toast.success("Welcome to your new plan! 🎉");
+      // Refresh user data to get updated subscription
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          fetchUserData(session.user.id);
+        }
+      });
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);

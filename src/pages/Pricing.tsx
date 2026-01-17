@@ -93,7 +93,6 @@ const plans: Plan[] = [
       { text: "2,500 AI palette generations/month", included: true },
       { text: "300 Ask Mode chat messages/month", included: true },
       { text: "View 50,000+ palettes", included: true },
-      { text: "Unlimited projects", included: true },
       { text: "Priority support", included: true },
     ],
   },
@@ -378,7 +377,13 @@ export default function Pricing() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-border">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => {
+            if (isLoggedIn) {
+              navigate("/dashboard");
+            } else {
+              navigate("/");
+            }
+          }}
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

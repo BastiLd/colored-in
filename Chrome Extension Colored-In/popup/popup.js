@@ -436,13 +436,31 @@ async function hydrateAssetsForDisplay(assets) {
   const hydrated = await Promise.all(
     assets.map(async (asset) => {
       if (asset.type !== 'image') return asset;
+      
+      // If already a signed URL, use it
       if (asset.url?.includes('/storage/v1/object/sign/')) {
         return { ...asset, displayUrl: asset.url };
       }
-      const path = SupabaseClient.getStoragePathFromUrl(asset.url);
-      if (!path) {
+      
+      // If it's a data URL or blob URL, use it directly
+      if (asset.url?.startsWith('data:') || asset.url?.startsWith('blob:')) {
         return { ...asset, displayUrl: asset.url };
       }
+      
+      // Try to get storage path from URL
+      let path = SupabaseClient.getStoragePathFromUrl(asset.url);
+      
+      // If path extraction failed, try using the URL directly as path if it looks like a path
+      if (!path && asset.url && !asset.url.startsWith('http') && asset.url.includes('/')) {
+        path = asset.url;
+      }
+      
+      if (!path) {
+        // Last resort: try to construct a signed URL from the raw URL
+        console.warn('Could not extract path from URL:', asset.url);
+        return { ...asset, displayUrl: asset.url };
+      }
+      
       const signedUrl = await SupabaseClient.createSignedUrl(bucket, path, 60 * 60);
       return { ...asset, displayUrl: signedUrl || asset.url };
     })
@@ -463,7 +481,17 @@ function renderAssets(assets, targetList) {
   const images = assets.filter(asset => asset.type === 'image');
   const links = assets.filter(asset => asset.type === 'link');
 
-  const renderGroup = (title, groupItems) => {
+  // Render images first (top)
+  if (images.length > 0) {
+    renderGroup('Images', images, list);
+  }
+  
+  // Render links second (bottom)
+  if (links.length > 0) {
+    renderGroup('Links', links, list);
+  }
+
+  function renderGroup(title, groupItems, targetList) {
     if (groupItems.length === 0) return;
     const group = document.createElement('div');
     group.className = 'asset-group';
@@ -488,8 +516,30 @@ function renderAssets(assets, targetList) {
 
       if (asset.type === 'image') {
         const img = document.createElement('img');
-        img.src = asset.displayUrl || asset.url;
+        const imageUrl = asset.displayUrl || asset.url;
+        img.src = imageUrl;
         img.alt = asset.filename || 'Image';
+        img.style.width = '40px';
+        img.style.height = '40px';
+        img.style.objectFit = 'cover';
+        img.style.borderRadius = '6px';
+        img.onerror = function() {
+          // If image fails to load, try to get a signed URL
+          const path = SupabaseClient.getStoragePathFromUrl(asset.url);
+          if (path) {
+            SupabaseClient.createSignedUrl('user-assets', path, 60 * 60).then(signedUrl => {
+              if (signedUrl) {
+                img.src = signedUrl;
+              }
+            }).catch(() => {
+              // If still fails, show placeholder
+              img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+            });
+          } else {
+            // Show placeholder if no path can be extracted
+            img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+          }
+        };
         item.appendChild(img);
       } else {
         const iconDiv = document.createElement('div');
@@ -512,11 +562,8 @@ function renderAssets(assets, targetList) {
     });
 
     group.appendChild(groupList);
-    list.appendChild(group);
-  };
-
-  renderGroup('Images', images);
-  renderGroup('Links', links);
+    targetList.appendChild(group);
+  }
 }
 
 async function loadUserPalettes() {
