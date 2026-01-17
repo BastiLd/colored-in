@@ -150,6 +150,8 @@ const Dashboard = () => {
     setCurrentView(view as DashboardView);
     if (view === "my-palettes" && user) {
       fetchUserPalettes(user.id);
+    } else if (view === "uploads" && user) {
+      fetchUserAssets(user.id);
     }
     if (view === "uploads" && user) {
       fetchUserAssets(user.id);
