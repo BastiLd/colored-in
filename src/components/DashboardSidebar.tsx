@@ -98,7 +98,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >
-          <Compass className="h-5 h-5" />
+          <Compass className="w-5 h-5" />
           <span>Explore</span>
         </button>
 

@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { GuidedTour, type TourStep } from "@/components/GuidedTour";
 import { useMemo } from "react";
 
-type DashboardView = "home" | "my-palettes" | "uploads" | "explore" | "generator" | "generator-old" | "usage" | "plan";
+type DashboardView = "home" | "my-palettes" | "uploads" | "generator" | "generator-old" | "usage" | "plan";
 
 interface UserProfile {
   email: string | null;
