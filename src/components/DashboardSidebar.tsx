@@ -28,7 +28,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
   };
 
   return (
-    <aside className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0">
+    <aside className="w-64 bg-card border-r border-border flex flex-col flex-shrink-0" data-tour="dashboard-sidebar">
       {/* Logo */}
       <div className="p-4 border-b border-border">
         <button

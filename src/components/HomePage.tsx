@@ -435,7 +435,7 @@ export function HomePage({
 
       {/* Hero Section */}
       <main className="container mx-auto px-6 py-12 md:py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 items-center mb-20">
           {/* Left - Text */}
           <div className="space-y-8">
             <div className="space-y-4">
@@ -446,13 +446,13 @@ export function HomePage({
             </div>
 
             <div className="flex flex-wrap gap-4">
-              <button onClick={() => setShowAIGenerator(true)} className="px-6 py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all shadow-lg">
+              <button onClick={() => setShowAIGenerator(true)} className="px-6 py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all shadow-lg hover:scale-105">
                 Generate with AI
               </button>
-              <button onClick={handleManualGenerator} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors">
+              <button onClick={handleManualGenerator} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors hover:scale-105">
                 Manual Generator
               </button>
-              <button onClick={onBrowsePalettes} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors">
+              <button onClick={onBrowsePalettes} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors hover:scale-105">
                 Explore 50.000+ Palettes
               </button>
             </div>
@@ -469,6 +469,142 @@ export function HomePage({
 
             {/* Featured palette */}
             <FeaturedPalette palette={featuredPalette} />
+          </div>
+        </div>
+
+        {/* Features Section with Builder Images */}
+        <div className="mt-32 space-y-16">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl md:text-4xl font-bold">Powerful Features for Creative Professionals</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Everything you need to create, manage, and explore beautiful color palettes
+            </p>
+          </div>
+
+          {/* Feature Cards with Images */}
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Feature 1: Manual Builder */}
+            <div className="group bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all hover:shadow-xl">
+              <div className="relative mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-primary/20 to-accent/20 aspect-video flex items-center justify-center">
+                {/* Builder Preview Illustration */}
+                <div className="w-full h-full flex flex-col">
+                  <div className="flex h-1/2 gap-0">
+                    {['#8F1919', '#C53535', '#DB7458', '#DBAA7F', '#F0E1BA'].map((color, i) => (
+                      <div key={i} className="flex-1" style={{ backgroundColor: color }} />
+                    ))}
+                  </div>
+                  <div className="h-1/2 bg-muted/50 flex items-center justify-center">
+                    <Palette className="w-12 h-12 text-primary/50" />
+                  </div>
+                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Pro Manual Builder</h3>
+              <p className="text-sm text-muted-foreground">
+                Full control over every color. Lock, regenerate, harmonize, and save your perfect palettes with advanced tools.
+              </p>
+            </div>
+
+            {/* Feature 2: AI Generator */}
+            <div className="group bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all hover:shadow-xl">
+              <div className="relative mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-accent/20 to-pink-500/20 aspect-video flex items-center justify-center">
+                <div className="w-full h-full flex flex-col items-center justify-center space-y-4">
+                  <Sparkles className="w-16 h-16 text-accent/50 animate-pulse" />
+                  <div className="flex gap-2">
+                    {['#3B82F6', '#60A5FA', '#93C5FD', '#DBEAFE'].map((color, i) => (
+                      <div key={i} className="w-12 h-12 rounded-lg" style={{ backgroundColor: color }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">AI Palette Generator</h3>
+              <p className="text-sm text-muted-foreground">
+                Describe your vision and let AI create stunning color palettes with detailed explanations for each color.
+              </p>
+            </div>
+
+            {/* Feature 3: Asset Analysis */}
+            <div className="group bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all hover:shadow-xl">
+              <div className="relative mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20 aspect-video flex items-center justify-center">
+                <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
+                  <div className="w-20 h-20 rounded-lg bg-muted/50 border-2 border-dashed border-primary/30 flex items-center justify-center">
+                    <Image className="w-8 h-8 text-primary/50" />
+                  </div>
+                  <div className="flex gap-1">
+                    {['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'].map((color, i) => (
+                      <div key={i} className="w-8 h-8 rounded" style={{ backgroundColor: color }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Asset Analysis</h3>
+              <p className="text-sm text-muted-foreground">
+                Upload images or add website links. AI analyzes them and generates matching color palettes automatically.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* FAQ Section */}
+        <div className="mt-32 space-y-12">
+          <div className="text-center space-y-4">
+            <h2 className="text-3xl md:text-4xl font-bold">Frequently Asked Questions</h2>
+            <p className="text-muted-foreground">Everything you need to know about Colored In</p>
+          </div>
+
+          <div className="max-w-3xl mx-auto space-y-6">
+            <details className="group bg-card border border-border rounded-xl p-6 hover:border-primary/50 transition-colors">
+              <summary className="cursor-pointer font-semibold text-lg mb-3 list-none flex items-center justify-between">
+                <span>Was ist der Pro Manual Builder?</span>
+                <span className="text-primary group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <p className="text-muted-foreground mt-4 leading-relaxed">
+                Der Pro Manual Builder ist ein professionelles Tool zum Erstellen von Farbpaletten mit vollständiger Kontrolle über jeden Aspekt. 
+                Du kannst Farben manuell auswählen, sperren, regenerieren, harmonisieren und mit KI-Unterstützung optimieren. 
+                Es bietet erweiterte Funktionen wie Asset-Upload, KI-Analyse von Bildern und Websites, Chat-Unterstützung für Farbtheorie-Fragen, 
+                und die Möglichkeit, Paletten zu speichern und zu organisieren.
+              </p>
+            </details>
+
+            <details className="group bg-card border border-border rounded-xl p-6 hover:border-primary/50 transition-colors">
+              <summary className="cursor-pointer font-semibold text-lg mb-3 list-none flex items-center justify-between">
+                <span>Wofür braucht man den?</span>
+                <span className="text-primary group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <p className="text-muted-foreground mt-4 leading-relaxed">
+                Der Pro Manual Builder ist ideal für Designer, Entwickler, Marketer und alle kreativen Profis, die präzise Farbpaletten benötigen. 
+                Nutze ihn für Branding-Projekte, Webdesign, UI/UX-Design, Marketing-Materialien, oder um Inspiration aus bestehenden Designs zu extrahieren. 
+                Die KI-Analyse-Funktion ermöglicht es dir, Farben aus Logos, Websites oder Bildern zu extrahieren und zu verbessern.
+              </p>
+            </details>
+
+            <details className="group bg-card border border-border rounded-xl p-6 hover:border-primary/50 transition-colors">
+              <summary className="cursor-pointer font-semibold text-lg mb-3 list-none flex items-center justify-between">
+                <span>Warum soll ich dafür Geld bezahlen, was ist mein Mehrwert wenn ich das besitze?</span>
+                <span className="text-primary group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <p className="text-muted-foreground mt-4 leading-relaxed">
+                Mit dem Pro Manual Builder sparst du wertvolle Zeit und erhältst professionelle Ergebnisse. 
+                Du bekommst unbegrenzte KI-Paletten-Generierungen (je nach Plan), Asset-Analyse für Bilder und Websites, 
+                erweiterte Bearbeitungsfunktionen, Chat-Unterstützung für Farbtheorie, Zugriff auf tausende kuratierte Paletten, 
+                und die Möglichkeit, deine Paletten zu speichern und zu organisieren. 
+                Die Zeitersparnis und die Qualität der Ergebnisse machen die Investition mehr als wett.
+              </p>
+            </details>
+
+            <details className="group bg-card border border-border rounded-xl p-6 hover:border-primary/50 transition-colors">
+              <summary className="cursor-pointer font-semibold text-lg mb-3 list-none flex items-center justify-between">
+                <span>Wie sieht der aus?</span>
+                <span className="text-primary group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <p className="text-muted-foreground mt-4 leading-relaxed">
+                Der Pro Manual Builder hat ein modernes, intuitives Interface mit drei Hauptbereichen: 
+                Links die Ressourcen-Sidebar mit Paletten, Farben und Assets, in der Mitte die große Palette-Canvas 
+                mit auswählbaren Farbfeldern, und rechts der KI-Chat-Assistent. 
+                Die Oberfläche ist dunkel gehalten für bessere Farbwahrnehmung und bietet alle Tools, die du brauchst, 
+                ohne überladen zu wirken. Probiere es einfach aus - die erste Tour führt dich durch alle Funktionen!
+              </p>
+            </details>
           </div>
         </div>
       </main>

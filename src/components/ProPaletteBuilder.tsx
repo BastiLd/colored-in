@@ -29,6 +29,7 @@ import { getPlanLimits } from "@/lib/planLimits";
 import { AssetsPanel } from "@/components/AssetsPanel";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { GuidedTour, type TourStep } from "@/components/GuidedTour";
 import {
   Panel,
   PanelGroup,
@@ -647,8 +648,49 @@ export function ProPaletteBuilder({
     return luminance > 0.5 ? "#000000" : "#FFFFFF";
   };
 
+  const proTourSteps = useMemo<TourStep[]>(
+    () => [
+      {
+        id: "palette",
+        selector: '[data-tour="pro-palette"]',
+        title: "Your Color Palette",
+        description: "Click any color to select it. Selected colors are highlighted with a purple ring. Click the Copy button to copy the hex code.",
+        placement: "bottom",
+      },
+      {
+        id: "sidebar",
+        selector: '[data-tour="pro-sidebar"]',
+        title: "Resources Panel",
+        description: "Browse curated palettes, pick individual colors, or manage your uploaded images and links. Switch between tabs to access different resources.",
+        placement: "right",
+      },
+      {
+        id: "assets",
+        selector: '[data-tour="pro-assets"]',
+        title: "Upload & Analyze Assets",
+        description: "Upload images or add website links, then click 'Analyze' to generate color palettes from them. Perfect for extracting colors from designs!",
+        placement: "right",
+      },
+      {
+        id: "chat",
+        selector: '[data-tour="pro-chat"]',
+        title: "AI Chat Assistant",
+        description: "Ask questions about color theory or use Edit mode to modify your palette with natural language. Try 'Make it warmer' or 'Add more contrast'!",
+        placement: "left",
+      },
+      {
+        id: "save",
+        selector: '[data-tour="pro-save"]',
+        title: "Save Your Palette",
+        description: "Save your palette to access it later in 'My Palettes'. You can organize and reuse your favorite color combinations.",
+        placement: "top",
+      },
+    ],
+    []
+  );
+
   const sidebarContent = (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="h-full flex flex-col min-h-0" data-tour="pro-sidebar">
       <div className="p-4 border-b border-border space-y-3">
         <div className="flex items-center gap-2">
           <ListFilter className="w-4 h-4 text-muted-foreground" />
@@ -776,16 +818,18 @@ export function ProPaletteBuilder({
           )}
           {sidebarTab === "assets" && (
             userId ? (
-              <AssetsPanel 
-                userId={userId} 
-                userPlan={userPlan} 
-                onPaletteGenerated={(colors, name) => {
-                  setColorSlots(colors.map(c => ({ color: c, locked: false })));
-                  toast.success(`Applied palette "${name}" from asset analysis`, { 
-                    position: TOAST_POSITION 
-                  });
-                }}
-              />
+              <div data-tour="pro-assets">
+                <AssetsPanel 
+                  userId={userId} 
+                  userPlan={userPlan} 
+                  onPaletteGenerated={(colors, name) => {
+                    setColorSlots(colors.map(c => ({ color: c, locked: false })));
+                    toast.success(`Applied palette "${name}" from asset analysis`, { 
+                      position: TOAST_POSITION 
+                    });
+                  }}
+                />
+              </div>
             ) : (
               <div className="text-sm text-muted-foreground">
                 Sign in to manage assets.
@@ -798,7 +842,7 @@ export function ProPaletteBuilder({
   );
 
   const chatContent = (
-    <div className="h-full flex flex-col min-h-0">
+    <div className="h-full flex flex-col min-h-0" data-tour="pro-chat">
       <div className="p-4 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MessageCircle className="w-4 h-4 text-primary" />
@@ -1051,7 +1095,7 @@ export function ProPaletteBuilder({
             <div className="flex-1 flex">
               <div className="flex-1 flex flex-col">
                 {/* Sticky color bar (always visible) */}
-                <div className="sticky top-0 z-10 flex h-20 gap-0 overflow-hidden shadow-md bg-background border-b border-border">
+                <div className="sticky top-0 z-10 flex h-20 gap-0 overflow-hidden shadow-md bg-background border-b border-border" data-tour="pro-palette">
                   {colorSlots.map((slot, idx) => {
                     const isSelected = idx === selected;
                     const textColor = contrastColor(slot.color);
@@ -1187,7 +1231,7 @@ export function ProPaletteBuilder({
                   <Copy className="w-4 h-4 mr-2" />
                   Copy CSV
                 </Button>
-                <Button variant="outline" size="sm" onClick={savePalette}>
+                <Button variant="outline" size="sm" onClick={savePalette} data-tour="pro-save">
                   <Save className="w-4 h-4 mr-2" />
                   Save
                 </Button>
@@ -1409,7 +1453,7 @@ export function ProPaletteBuilder({
                     <Copy className="w-4 h-4 mr-2" />
                     Copy CSV
                   </Button>
-                  <Button variant="outline" size="sm" onClick={savePalette}>
+                  <Button variant="outline" size="sm" onClick={savePalette} data-tour="pro-save">
                     <Save className="w-4 h-4 mr-2" />
                     Save
                   </Button>
@@ -1575,6 +1619,7 @@ export function ProPaletteBuilder({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <GuidedTour storageKey="tour-pro-builder" steps={proTourSteps} enabled />
     </>
   );
 }

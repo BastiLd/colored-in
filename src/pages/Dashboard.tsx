@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoragePathFromUrl, USER_ASSETS_BUCKET } from "@/lib/storage";
@@ -14,6 +14,8 @@ import { AIPaletteGenerator } from "@/components/AIPaletteGenerator";
 import { PaletteDetailModal } from "@/components/PaletteDetailModal";
 import { getPlanLimits } from "@/lib/planLimits";
 import { toast } from "sonner";
+import { GuidedTour, type TourStep } from "@/components/GuidedTour";
+import { useMemo } from "react";
 
 type DashboardView = "home" | "my-palettes" | "uploads" | "explore" | "generator" | "generator-old" | "usage" | "plan";
 
@@ -262,6 +264,47 @@ const Dashboard = () => {
     toast.success("Copied all colors!");
   };
 
+  const dashboardTourSteps = useMemo<TourStep[]>(
+    () => [
+      {
+        id: "sidebar",
+        selector: '[data-tour="dashboard-sidebar"]',
+        title: "Navigation Sidebar",
+        description: "Use the sidebar to navigate between different sections: Home, My Palettes, My Uploads, Explore, Usage, and Plan settings.",
+        placement: "right",
+      },
+      {
+        id: "manual-builder",
+        selector: '[data-tour="dashboard-manual"]',
+        title: "Manual Builder",
+        description: "Create color palettes manually with full control. Lock colors, regenerate, and save your creations.",
+        placement: "bottom",
+      },
+      {
+        id: "ai-generator",
+        selector: '[data-tour="dashboard-ai"]',
+        title: "AI Palette Generator",
+        description: "Generate beautiful color palettes using AI. Just describe what you want, and AI will create it for you!",
+        placement: "bottom",
+      },
+      {
+        id: "explore",
+        selector: '[data-tour="dashboard-explore"]',
+        title: "Explore Palettes",
+        description: "Browse thousands of curated color palettes. Find inspiration and discover new color combinations.",
+        placement: "bottom",
+      },
+      {
+        id: "my-palettes",
+        selector: '[data-tour="dashboard-palettes"]',
+        title: "My Palettes",
+        description: "View all your saved palettes. Click on any palette name to see detailed color information and descriptions.",
+        placement: "bottom",
+      },
+    ],
+    []
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -327,7 +370,8 @@ const Dashboard = () => {
       <DashboardSidebar 
         profile={profile} 
         currentView={currentView} 
-        onViewChange={handleViewChange} 
+        onViewChange={handleViewChange}
+        data-tour="dashboard-sidebar"
       />
 
       {/* Main Content */}
@@ -352,6 +396,7 @@ const Dashboard = () => {
               <button
                 onClick={() => setCurrentView("generator")}
                 className="p-6 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors text-left group"
+                data-tour="dashboard-manual"
               >
                 <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
                   <Palette className="h-6 w-6 text-primary" />
@@ -365,6 +410,7 @@ const Dashboard = () => {
               <button
                 onClick={() => setShowAIGenerator(true)}
                 className="p-6 bg-card border border-border rounded-xl hover:border-accent/50 transition-colors text-left group"
+                data-tour="dashboard-ai"
               >
                 <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center mb-4 group-hover:bg-accent/20 transition-colors">
                   <Sparkles className="h-6 w-6 text-accent" />
@@ -378,6 +424,7 @@ const Dashboard = () => {
               <button
                 onClick={() => setCurrentView("explore")}
                 className="p-6 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors text-left group"
+                data-tour="dashboard-explore"
               >
                 <div className="w-12 h-12 rounded-lg bg-purple-500/10 flex items-center justify-center mb-4 group-hover:bg-purple-500/20 transition-colors">
                   <Compass className="h-6 w-6 text-purple-500" />
@@ -391,6 +438,7 @@ const Dashboard = () => {
               <button
                 onClick={() => setCurrentView("my-palettes")}
                 className="p-6 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors text-left group"
+                data-tour="dashboard-palettes"
               >
                 <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center mb-4 group-hover:bg-green-500/20 transition-colors">
                   <Home className="h-6 w-6 text-green-500" />
@@ -687,6 +735,10 @@ const Dashboard = () => {
           }}
           onClose={() => setSelectedPalette(null)}
         />
+      )}
+
+      {currentView === "home" && (
+        <GuidedTour storageKey="tour-dashboard" steps={dashboardTourSteps} enabled />
       )}
     </div>
   );

@@ -1,10 +1,14 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Send, X, Sparkles, Loader2, LogIn } from "lucide-react";
+import { Send, X, Sparkles, Loader2, LogIn, Upload, Image as ImageIcon, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getFreePalettes, Palette } from "@/data/palettes";
 import { User } from "@supabase/supabase-js";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { PaletteDetailModal } from "@/components/PaletteDetailModal";
 
 interface AIPaletteGeneratorProps {
   isOpen: boolean;
@@ -154,6 +158,18 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
   const [generationCount, setGenerationCount] = useState(0);
   const [hasReachedLimit, setHasReachedLimit] = useState(false);
   const navigate = useNavigate();
+  
+  // Logo improvement feature (Pro+ only)
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [improvementText, setImprovementText] = useState("");
+  const [isImproving, setIsImproving] = useState(false);
+  const [improvedPalette, setImprovedPalette] = useState<GeneratedPalette | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedPaletteForDetail, setSelectedPaletteForDetail] = useState<GeneratedPalette | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const isProPlus = userPlan === "pro" || userPlan === "ultra" || userPlan === "individual";
   
   const allPalettes = useMemo(() => getFreePalettes(), []);
   
@@ -343,6 +359,78 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
     toast.success("Copied all colors!", { duration: 1500 });
   };
 
+  const handleImproveLogo = async () => {
+    if (!logoFile || !user) return;
+
+    setIsImproving(true);
+    setImprovedPalette(null);
+
+    try {
+      // Upload logo to storage
+      const fileExt = logoFile.name.split(".").pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("user-assets")
+        .upload(filePath, logoFile);
+
+      if (uploadError) {
+        throw new Error("Failed to upload logo");
+      }
+
+      // Get signed URL
+      const { data: signedUrlData } = await supabase.storage
+        .from("user-assets")
+        .createSignedUrl(filePath, 60 * 60);
+
+      if (!signedUrlData?.signedUrl) {
+        throw new Error("Failed to get logo URL");
+      }
+
+      // Call analyze-asset with improve mode
+      const { data, error } = await supabase.functions.invoke('analyze-asset', {
+        body: {
+          assetType: 'image',
+          assetUrl: signedUrlData.signedUrl,
+          mode: 'improve',
+          expandText: improvementText || 'Improve this logo and create a better color palette',
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      if (data?.colors && Array.isArray(data.colors)) {
+        setImprovedPalette({
+          name: data.name || 'Improved Logo Palette',
+          colors: data.colors,
+          tags: data.tags || ['improved', 'logo'],
+          description: data.description,
+          colorDescriptions: data.colorDescriptions || [],
+        });
+        toast.success("Logo improved and palette generated!");
+      } else {
+        throw new Error("Invalid response from server");
+      }
+    } catch (error: any) {
+      console.error('Error improving logo:', error);
+      toast.error(error.message || "Failed to improve logo");
+    } finally {
+      setIsImproving(false);
+    }
+  };
+
+  const handleViewDetail = (palette: GeneratedPalette) => {
+    setSelectedPaletteForDetail(palette);
+    setShowDetailModal(true);
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -445,46 +533,150 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="mb-6">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Describe colors, mood, or theme..."
-                  className="flex-1 px-4 py-3 bg-muted border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-                  disabled={isLoading || hasReachedLimit}
-                />
-                <button
-                  type="submit"
-                  disabled={isLoading || !prompt.trim() || hasReachedLimit}
-                  className="px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <Send className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-            </form>
+            <>
+              <form onSubmit={handleSubmit} className="mb-6">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Describe colors, mood, or theme..."
+                    className="flex-1 px-4 py-3 bg-muted border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    disabled={isLoading || hasReachedLimit}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isLoading || !prompt.trim() || hasReachedLimit}
+                    className="px-4 py-3 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Send className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {/* Logo Improvement Feature (Pro+ only) */}
+              {isProPlus && (
+                <div className="mb-6 p-4 bg-muted/50 border border-border rounded-lg space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Wand2 className="w-4 h-4 text-primary" />
+                    <Label className="text-sm font-semibold">Improve Logo (Pro Feature)</Label>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setLogoFile(file);
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                              setLogoPreview(e.target?.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {logoFile ? logoFile.name : "Upload Logo"}
+                      </Button>
+                      {logoPreview && (
+                        <div className="mt-2 relative">
+                          <img
+                            src={logoPreview}
+                            alt="Logo preview"
+                            className="w-full h-32 object-contain rounded-lg border border-border"
+                          />
+                          <button
+                            onClick={() => {
+                              setLogoFile(null);
+                              setLogoPreview(null);
+                            }}
+                            className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full hover:opacity-90"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="improvement-text" className="text-xs text-muted-foreground">
+                        Optional: Describe how to improve the logo
+                      </Label>
+                      <Textarea
+                        id="improvement-text"
+                        value={improvementText}
+                        onChange={(e) => setImprovementText(e.target.value)}
+                        placeholder="e.g., Make it more vibrant and modern, add more contrast..."
+                        className="mt-1 min-h-[60px] text-sm"
+                        disabled={isImproving}
+                      />
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={handleImproveLogo}
+                      disabled={!logoFile || isImproving}
+                      className="w-full"
+                      size="sm"
+                    >
+                      {isImproving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Improving...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 className="w-4 h-4 mr-2" />
+                          Improve Logo & Generate Palette
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {/* Generated palette display */}
-          {generatedPalette && (
+          {(generatedPalette || improvedPalette) && (
             <div className="space-y-4 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-foreground">{generatedPalette.name}</h3>
-                <button
-                  onClick={copyAllColors}
-                  className="text-xs px-2 py-1 bg-muted rounded hover:bg-muted/80 transition-colors"
-                >
-                  Copy All
-                </button>
+                <h3 className="font-medium text-foreground">{(improvedPalette || generatedPalette)?.name}</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleViewDetail((improvedPalette || generatedPalette)!)}
+                    className="text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors"
+                  >
+                    View Details
+                  </button>
+                  <button
+                    onClick={copyAllColors}
+                    className="text-xs px-2 py-1 bg-muted rounded hover:bg-muted/80 transition-colors"
+                  >
+                    Copy All
+                  </button>
+                </div>
               </div>
               
               <div className="flex rounded-xl overflow-hidden h-24">
-                {generatedPalette.colors.map((color, i) => (
+                {(improvedPalette || generatedPalette)?.colors.map((color, i) => (
                   <div
                     key={i}
                     className="flex-1 flex items-center justify-center cursor-pointer transition-all duration-200 hover:flex-[1.5]"
@@ -559,6 +751,22 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
           )}
         </div>
       </div>
+
+      {/* Detail Modal */}
+      {showDetailModal && selectedPaletteForDetail && (
+        <PaletteDetailModal
+          palette={{
+            name: selectedPaletteForDetail.name,
+            colors: selectedPaletteForDetail.colors,
+            description: selectedPaletteForDetail.description,
+            colorDescriptions: selectedPaletteForDetail.colorDescriptions,
+          }}
+          onClose={() => {
+            setShowDetailModal(false);
+            setSelectedPaletteForDetail(null);
+          }}
+        />
+      )}
     </div>
   );
 }
