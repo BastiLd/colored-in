@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { getFreePalettes, Palette } from "@/data/palettes";
+import { getFreePalettes, type Palette } from "@/data/palettes";
 import { AIPaletteGenerator } from "./AIPaletteGenerator";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";

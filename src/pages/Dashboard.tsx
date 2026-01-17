@@ -95,6 +95,10 @@ const Dashboard = () => {
         navigate("/auth");
       } else {
         fetchUserData(session.user.id);
+        // Load palettes if on my-palettes view
+        if (initialView === "my-palettes" || currentView === "my-palettes") {
+          fetchUserPalettes(session.user.id);
+        }
       }
       setLoading(false);
     });
@@ -320,13 +324,6 @@ const Dashboard = () => {
 
   const renderContent = () => {
     switch (currentView) {
-      case "explore":
-        return (
-          <PaletteBrowser
-            onBack={() => setCurrentView("home")}
-            onSelectPalette={handleSelectPalette}
-          />
-        );
       case "generator":
         // Paid plans get the Pro Builder by default
         if (isPaidPlan) {
@@ -349,7 +346,7 @@ const Dashboard = () => {
         // Old design for paid users who want to switch back
         return (
           <PaletteGenerator
-            onBrowse={() => setCurrentView("explore")}
+            onBrowse={() => navigate("/explore")}
             onHome={() => setCurrentView("home")}
             onNewDesign={() => setCurrentView("generator")}
             showNewDesignButton={true}
@@ -361,7 +358,7 @@ const Dashboard = () => {
   };
 
   // Render full screen views
-  if (currentView === "explore" || currentView === "generator" || currentView === "generator-old") {
+  if (currentView === "generator" || currentView === "generator-old") {
     return renderContent();
   }
 
@@ -422,7 +419,7 @@ const Dashboard = () => {
               </button>
 
               <button
-                onClick={() => setCurrentView("explore")}
+                onClick={() => navigate("/explore")}
                 className="p-6 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors text-left group"
                 data-tour="dashboard-explore"
               >

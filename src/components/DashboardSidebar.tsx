@@ -91,14 +91,14 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
         </button>
 
         <button
-          onClick={() => onViewChange("explore")}
+          onClick={() => navigate("/explore")}
           className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
             currentView === "explore"
               ? "bg-primary text-primary-foreground"
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >
-          <Compass className="h-5 w-5" />
+          <Compass className="h-5 h-5" />
           <span>Explore</span>
         </button>
 
