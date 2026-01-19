@@ -477,56 +477,44 @@ async function loadAssets(targetList) {
 
 async function hydrateAssetsForDisplay(assets) {
   const bucket = 'user-assets';
-  const hydrated = await Promise.all(
-    assets.map(async (asset) => {
-      if (asset.type !== 'image') return asset;
-      
-      console.log('Processing asset:', asset.id, 'URL:', asset.url);
-      
-      // If already a signed URL, use it
-      if (asset.url?.includes('/storage/v1/object/sign/')) {
-        console.log('Asset already has signed URL');
-        return { ...asset, displayUrl: asset.url };
-      }
-      
-      // If it's a data URL or blob URL, use it directly
-      if (asset.url?.startsWith('data:') || asset.url?.startsWith('blob:')) {
-        console.log('Asset is data/blob URL');
-        return { ...asset, displayUrl: asset.url };
-      }
-      
-      // Try to get storage path from URL
-      let path = SupabaseClient.getStoragePathFromUrl(asset.url);
-      console.log('Extracted path:', path);
-      
-      // If path extraction failed, try using the URL directly as path if it looks like a path
-      if (!path && asset.url && !asset.url.startsWith('http') && asset.url.includes('/')) {
-        path = asset.url;
-        console.log('Using URL directly as path:', path);
-      }
-      
-      if (!path) {
-        // Last resort: try to construct a signed URL from the raw URL
-        console.warn('Could not extract path from URL:', asset.url);
-        return { ...asset, displayUrl: asset.url };
-      }
-      
-      // Always use signed URL for better compatibility with Chrome Extension context
-      console.log('Creating signed URL for path:', path);
-      const signedUrl = await SupabaseClient.createSignedUrl(bucket, path, 60 * 60);
-      console.log('Signed URL:', signedUrl);
-      
-      if (!signedUrl) {
-        console.error('Failed to create signed URL for:', path);
-        // Fallback to public URL
-        const publicUrl = SupabaseClient.getPublicUrl(bucket, path);
-        console.log('Fallback to public URL:', publicUrl);
-        return { ...asset, displayUrl: publicUrl || asset.url };
-      }
-      
-      return { ...asset, displayUrl: signedUrl };
-    })
-  );
+  const hydrated = assets.map((asset) => {
+    if (asset.type !== 'image') return asset;
+    
+    console.log('Processing asset:', asset.id, 'URL:', asset.url);
+    
+    // If it's a data URL or blob URL, use it directly
+    if (asset.url?.startsWith('data:') || asset.url?.startsWith('blob:')) {
+      console.log('Asset is data/blob URL');
+      return { ...asset, displayUrl: asset.url };
+    }
+    
+    // If the URL is already a public URL, use it directly
+    if (asset.url?.includes('/storage/v1/object/public/')) {
+      console.log('Asset already has public URL, using directly');
+      return { ...asset, displayUrl: asset.url };
+    }
+    
+    // Try to get storage path from URL
+    let path = SupabaseClient.getStoragePathFromUrl(asset.url);
+    console.log('Extracted path:', path);
+    
+    // If path extraction failed, try using the URL directly as path if it looks like a path
+    if (!path && asset.url && !asset.url.startsWith('http') && asset.url.includes('/')) {
+      path = asset.url;
+      console.log('Using URL directly as path:', path);
+    }
+    
+    if (!path) {
+      console.warn('Could not extract path from URL:', asset.url);
+      return { ...asset, displayUrl: asset.url };
+    }
+    
+    // Use public URL (bucket is public, no need for signed URLs)
+    const publicUrl = SupabaseClient.getPublicUrl(bucket, path);
+    console.log('Using public URL:', publicUrl);
+    return { ...asset, displayUrl: publicUrl || asset.url };
+  });
+  
   console.log('Hydrated assets:', hydrated);
   return hydrated;
 }
