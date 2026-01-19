@@ -5,7 +5,7 @@ import { getFreePalettes, type Palette } from "@/data/palettes";
 import { AIPaletteGenerator } from "./AIPaletteGenerator";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { LogOut, User as UserIcon, Sparkles, Palette as PaletteIcon } from "lucide-react";
+import { LogOut, User as UserIcon, Sparkles, Palette as PaletteIcon, Image as ImageIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -528,7 +528,7 @@ export function HomePage({
               <div className="relative mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20 aspect-video flex items-center justify-center">
                 <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
                   <div className="w-20 h-20 rounded-lg bg-muted/50 border-2 border-dashed border-primary/30 flex items-center justify-center">
-                    <Image className="w-8 h-8 text-primary/50" />
+                    <ImageIcon className="w-8 h-8 text-primary/50" />
                   </div>
                   <div className="flex gap-1">
                     {['#8B5CF6', '#A78BFA', '#C4B5FD', '#DDD6FE'].map((color, i) => (
