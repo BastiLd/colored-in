@@ -95,9 +95,11 @@ const Dashboard = () => {
         navigate("/auth");
       } else {
         fetchUserData(session.user.id);
-        // Load palettes if on my-palettes view
-        if (initialView === "my-palettes" || currentView === "my-palettes") {
+        const viewToLoad = initialView || currentView;
+        if (viewToLoad === "my-palettes") {
           fetchUserPalettes(session.user.id);
+        } else if (viewToLoad === "uploads") {
+          fetchUserAssets(session.user.id);
         }
       }
       setLoading(false);
@@ -151,9 +153,6 @@ const Dashboard = () => {
     if (view === "my-palettes" && user) {
       fetchUserPalettes(user.id);
     } else if (view === "uploads" && user) {
-      fetchUserAssets(user.id);
-    }
-    if (view === "uploads" && user) {
       fetchUserAssets(user.id);
     }
   };
