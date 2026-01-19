@@ -64,7 +64,9 @@ const Dashboard = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const initialView = params.get("view") as DashboardView | null;
-    if (initialView) {
+    if (initialView === "explore") {
+      navigate("/explore", { replace: true });
+    } else if (initialView) {
       setCurrentView(initialView);
     }
 
