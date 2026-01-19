@@ -90,10 +90,22 @@ const SupabaseClient = {
     return null;
   },
 
+  encodeStoragePath: function (path) {
+    if (!path) return '';
+    return encodeURIComponent(path).replace(/%2F/g, '/');
+  },
+
+  getPublicUrl: function (bucket, path) {
+    if (!bucket || !path) return null;
+    const safePath = this.encodeStoragePath(path);
+    return `${this.url}/storage/v1/object/public/${bucket}/${safePath}`;
+  },
+
   async createSignedUrl(bucket, path, expiresIn = 3600) {
     await this.ensureConfig();
     if (!path) return null;
-    const response = await fetch(`${this.url}/storage/v1/object/sign/${bucket}/${encodeURIComponent(path)}`, {
+    const safePath = this.encodeStoragePath(path);
+    const response = await fetch(`${this.url}/storage/v1/object/sign/${bucket}/${safePath}`, {
       method: 'POST',
       headers: {
         ...this.getHeaders(true),
@@ -281,8 +293,9 @@ const SupabaseClient = {
     const fileName = `${Date.now()}-${Math.random().toString(16).slice(2)}.${safeExt}`;
     const path = `${userId}/${fileName}`;
     const bucket = 'user-assets';
+    const safePath = this.encodeStoragePath(path);
 
-    const uploadRes = await fetch(`${this.url}/storage/v1/object/${bucket}/${encodeURIComponent(path)}`, {
+    const uploadRes = await fetch(`${this.url}/storage/v1/object/${bucket}/${safePath}`, {
       method: 'POST',
       headers: {
         apikey: this.key,

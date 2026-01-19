@@ -175,10 +175,16 @@ const Dashboard = () => {
         const { data, error } = await supabase.storage
           .from(USER_ASSETS_BUCKET)
           .createSignedUrl(path, 60 * 60);
-        if (error || !data?.signedUrl) {
-          return { ...asset, displayUrl: asset.url };
+        if (!error && data?.signedUrl) {
+          return { ...asset, displayUrl: data.signedUrl };
         }
-        return { ...asset, displayUrl: data.signedUrl };
+        const { data: publicData } = supabase.storage
+          .from(USER_ASSETS_BUCKET)
+          .getPublicUrl(path);
+        if (publicData?.publicUrl) {
+          return { ...asset, displayUrl: publicData.publicUrl };
+        }
+        return { ...asset, displayUrl: asset.url };
       })
     );
     setUserAssets(resolved);

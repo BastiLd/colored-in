@@ -462,7 +462,8 @@ async function hydrateAssetsForDisplay(assets) {
       }
       
       const signedUrl = await SupabaseClient.createSignedUrl(bucket, path, 60 * 60);
-      return { ...asset, displayUrl: signedUrl || asset.url };
+      const publicUrl = signedUrl ? null : SupabaseClient.getPublicUrl(bucket, path);
+      return { ...asset, displayUrl: signedUrl || publicUrl || asset.url };
     })
   );
   return hydrated;
@@ -524,19 +525,23 @@ function renderAssets(assets, targetList) {
         img.style.objectFit = 'cover';
         img.style.borderRadius = '6px';
         img.onerror = function() {
-          // If image fails to load, try to get a signed URL
-          const path = SupabaseClient.getStoragePathFromUrl(asset.url);
+          const path = SupabaseClient.getStoragePathFromUrl(asset.url) || asset.url;
           if (path) {
             SupabaseClient.createSignedUrl('user-assets', path, 60 * 60).then(signedUrl => {
               if (signedUrl) {
                 img.src = signedUrl;
+                return;
               }
+              const publicUrl = SupabaseClient.getPublicUrl('user-assets', path);
+              if (publicUrl) {
+                img.src = publicUrl;
+                return;
+              }
+              img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
             }).catch(() => {
-              // If still fails, show placeholder
               img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
             });
           } else {
-            // Show placeholder if no path can be extracted
             img.src = 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%23888" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
           }
         };
