@@ -38,6 +38,7 @@ const SupabaseClient = {
   url: SUPABASE_URL,
   key: SUPABASE_ANON_KEY,
   accessToken: null,
+  signedUrlCache: new Map(),
   normalizePlan: function (plan) {
     const p = (typeof plan === 'string' ? plan : '').toLowerCase();
     if (!p) return 'free';
@@ -104,6 +105,12 @@ const SupabaseClient = {
   async createSignedUrl(bucket, path, expiresIn = 3600) {
     await this.ensureConfig();
     if (!path) return null;
+    await this.ensureAuth();
+    const cacheKey = `${bucket}:${path}:${expiresIn}`;
+    const cached = this.signedUrlCache.get(cacheKey);
+    if (cached && cached.expiresAt && cached.expiresAt > Date.now() + 30_000 && cached.url) {
+      return cached.url;
+    }
     const safePath = this.encodeStoragePath(path);
     const response = await fetch(`${this.url}/storage/v1/object/sign/${bucket}/${safePath}`, {
       method: 'POST',
@@ -122,7 +129,18 @@ const SupabaseClient = {
     const signedUrl = data?.signedUrl || data?.signedURL || data?.signed_url;
     if (!signedUrl) return null;
     if (signedUrl.startsWith('http')) return signedUrl;
-    return `${this.url}${signedUrl.startsWith('/') ? '' : '/'}${signedUrl}`;
+    const full = `${this.url}${signedUrl.startsWith('/') ? '' : '/'}${signedUrl}`;
+    this.signedUrlCache.set(cacheKey, { url: full, expiresAt: Date.now() + expiresIn * 1000 });
+    return full;
+  },
+
+  async ensureAuth() {
+    // Make sure we have a valid access token loaded (or refreshed) from chrome.storage.
+    if (this.accessToken) return true;
+    await this.getSession();
+    if (this.accessToken) return true;
+    const refreshed = await this.refreshSession();
+    return Boolean(refreshed?.access_token);
   },
 
   // Login with email and password
@@ -208,6 +226,7 @@ const SupabaseClient = {
   // Get user subscription
   async getUserSubscription(userId) {
     await this.ensureConfig();
+    await this.ensureAuth();
     const response = await fetch(
       `${this.url}/rest/v1/user_subscriptions?user_id=eq.${userId}&select=*`,
       {
@@ -226,6 +245,7 @@ const SupabaseClient = {
   // Get user assets
   async getUserAssets(userId) {
     await this.ensureConfig();
+    await this.ensureAuth();
     const response = await fetch(
       `${this.url}/rest/v1/user_assets?user_id=eq.${userId}&select=*&order=created_at.desc`,
       {
@@ -243,6 +263,7 @@ const SupabaseClient = {
   // Get user palettes
   async getUserPalettes(userId) {
     await this.ensureConfig();
+    await this.ensureAuth();
     const response = await fetch(
       `${this.url}/rest/v1/public_palettes?created_by=eq.${userId}&select=id,name,colors,tags,description,color_descriptions&order=created_at.desc`,
       {
@@ -260,6 +281,7 @@ const SupabaseClient = {
   // Save a link or image asset record
   async createUserAsset(payload) {
     await this.ensureConfig();
+    await this.ensureAuth();
     const response = await fetch(`${this.url}/rest/v1/user_assets`, {
       method: 'POST',
       headers: {
@@ -287,6 +309,7 @@ const SupabaseClient = {
   // Upload an image to Storage and return its path + signed URL
   async uploadUserAssetImage(userId, file) {
     await this.ensureConfig();
+    await this.ensureAuth();
     if (!file || !file.name) throw new Error('Missing file');
 
     const safeExt = (file.name.split('.').pop() || 'png').replace(/[^a-zA-Z0-9]/g, '');
@@ -318,6 +341,7 @@ const SupabaseClient = {
   // Call Edge Function: generate-palette
   async generatePalette(prompt) {
     await this.ensureConfig();
+    await this.ensureAuth();
     const response = await fetch(`${this.url}/functions/v1/generate-palette`, {
       method: 'POST',
       headers: this.getHeaders(true),
@@ -335,6 +359,7 @@ const SupabaseClient = {
   // Call Edge Function: analyze-asset
   async analyzeAsset(assetType, assetUrl, mode = 'extract', expandText = '') {
     await this.ensureConfig();
+    await this.ensureAuth();
     const response = await fetch(`${this.url}/functions/v1/analyze-asset`, {
       method: 'POST',
       headers: this.getHeaders(true),

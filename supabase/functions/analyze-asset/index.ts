@@ -82,9 +82,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const { assetType, assetUrl, mode = 'extract', expandText = '' } = await req.json();
-    
-    console.log('Request params:', { 
-      assetType, 
+
+    console.log('Request params:', {
+      assetType,
       assetUrl: assetUrl?.substring(0, 50),
       mode,
       expandText: expandText?.substring(0, 50)
@@ -137,9 +137,9 @@ Deno.serve(async (req: Request) => {
 
     const token = authHeader.replace('Bearer ', '').trim();
     const userRes = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: { 
-        Authorization: `Bearer ${token}`, 
-        apikey: supabaseServiceKey 
+      headers: {
+        Authorization: `Bearer ${token}`,
+        apikey: supabaseServiceKey
       },
     });
 
@@ -171,10 +171,10 @@ Deno.serve(async (req: Request) => {
     const userPlan = normalizePlan(subscription?.plan);
     const isActive = Boolean(subscription?.is_active);
     const isPremium = isActive && (userPlan === 'ultra' || userPlan === 'individual');
-    
+
     // For basic analysis, Pro is enough. For advanced modes, Ultra/Individual required
     const isPaid = isActive && userPlan !== 'free';
-    
+
     if (!isPaid) {
       return new Response(
         JSON.stringify({ error: 'This feature requires a paid plan. Upgrade to Pro!' }),
@@ -195,11 +195,11 @@ Deno.serve(async (req: Request) => {
     // If the image is from Supabase Storage, we need to fetch it and convert to base64
     // because OpenAI cannot access Supabase Storage URLs directly
     let imageUrlForAI = assetUrl;
-    
+
     if (assetType === 'image') {
       const isSupabaseUrl = assetUrl.includes('supabase.co/storage');
       const isDataUrl = assetUrl.startsWith('data:');
-      
+
       if (isSupabaseUrl && !isDataUrl) {
         console.log('Converting Supabase Storage image to base64...');
         try {
@@ -238,14 +238,14 @@ Deno.serve(async (req: Request) => {
           // Get the image as ArrayBuffer and convert to base64
           const arrayBuffer = await fileData.arrayBuffer();
           const uint8Array = new Uint8Array(arrayBuffer);
-          
+
           // Convert to base64
           let binary = '';
           for (let i = 0; i < uint8Array.length; i++) {
             binary += String.fromCharCode(uint8Array[i]);
           }
           const base64 = btoa(binary);
-          
+
           // Create data URL
           imageUrlForAI = `data:${contentType};base64,${base64}`;
           console.log('Image converted to base64, length:', base64.length);
@@ -264,8 +264,8 @@ Deno.serve(async (req: Request) => {
     }
 
     // Build prompts based on mode
-    let systemPrompt: string;
-    let userContent: { type: string; text?: string; image_url?: { url: string } }[];
+    let systemPrompt = "";
+    let userContent: { type: string; text?: string; image_url?: { url: string } }[] = [];
 
     if (mode === 'extract') {
       // EXTRACT MODE: Get exact colors from the asset (variable length 2-10)
@@ -310,7 +310,7 @@ Rules:
     } else if (mode === 'expand') {
       // EXPAND MODE: Create palette based on asset + user's description
       const userDescription = expandText || 'Create a harmonious palette';
-      
+
       if (assetType === 'image') {
         systemPrompt = `You are a creative color palette designer. Analyze the image AND incorporate the user's creative direction to generate a unique palette.
 
@@ -474,7 +474,7 @@ Rules:
     // Validate the palette - allow variable length for extract mode
     const minColors = mode === 'extract' ? 2 : 5;
     const maxColors = mode === 'extract' ? 10 : 6;
-    
+
     if (!parsedPalette.colors || !Array.isArray(parsedPalette.colors)) {
       return new Response(
         JSON.stringify({ error: 'Invalid palette format from AI' }),

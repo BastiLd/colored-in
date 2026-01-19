@@ -15,7 +15,6 @@ import { PaletteDetailModal } from "@/components/PaletteDetailModal";
 import { getPlanLimits } from "@/lib/planLimits";
 import { toast } from "sonner";
 import { GuidedTour, type TourStep } from "@/components/GuidedTour";
-import { useMemo } from "react";
 
 type DashboardView = "home" | "my-palettes" | "uploads" | "generator" | "generator-old" | "usage" | "plan";
 
@@ -63,10 +62,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const initialView = params.get("view") as DashboardView | null;
-    if (initialView === "explore") {
+    const initialViewRaw = params.get("view");
+    if (initialViewRaw === "explore") {
       navigate("/explore", { replace: true });
-    } else if (initialView) {
+    }
+    const initialView = (initialViewRaw as DashboardView | null) || null;
+    if (initialView) {
       setCurrentView(initialView);
     }
 
@@ -249,7 +250,7 @@ const Dashboard = () => {
         .eq("id", assetId);
 
       if (error) throw error;
-      
+
       setUserAssets(prev => prev.filter(a => a.id !== assetId));
       toast.success("Upload deleted");
     } catch (error) {
@@ -285,7 +286,7 @@ const Dashboard = () => {
         .eq("id", paletteId);
 
       if (error) throw error;
-      
+
       setUserPalettes(prev => prev.filter(p => p.id !== paletteId));
       toast.success("Palette deleted");
     } catch (error) {
@@ -395,9 +396,9 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <DashboardSidebar 
-        profile={profile} 
-        currentView={currentView} 
+      <DashboardSidebar
+        profile={profile}
+        currentView={currentView}
         onViewChange={handleViewChange}
         data-tour="dashboard-sidebar"
       />
@@ -541,8 +542,6 @@ const Dashboard = () => {
                 </p>
                 <button
                   onClick={() => handleViewChange("generator")}
-                <button
-                  onClick={() => handleViewChange("generator")}
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
                 >
                   Create Palette
@@ -644,9 +643,9 @@ const Dashboard = () => {
                           className="group relative bg-card border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-colors"
                         >
                           <div className="aspect-square">
-                            <img 
-                              src={asset.displayUrl || asset.url} 
-                              alt={asset.filename || "Uploaded image"} 
+                            <img
+                              src={asset.displayUrl || asset.url}
+                              alt={asset.filename || "Uploaded image"}
                               className="w-full h-full object-cover"
                             />
                           </div>
@@ -689,7 +688,7 @@ const Dashboard = () => {
                         } catch {
                           // Keep original if parsing fails
                         }
-                        
+
                         return (
                           <div
                             key={asset.id}
@@ -741,18 +740,18 @@ const Dashboard = () => {
         )}
 
         {currentView === "plan" && (
-          <PlanContent 
-            profile={profile} 
-            generationCount={generationCount} 
-            lastGeneration={lastGeneration} 
+          <PlanContent
+            profile={profile}
+            generationCount={generationCount}
+            lastGeneration={lastGeneration}
           />
         )}
       </main>
 
       {/* AI Palette Generator Modal */}
-      <AIPaletteGenerator 
-        isOpen={showAIGenerator} 
-        onClose={() => setShowAIGenerator(false)} 
+      <AIPaletteGenerator
+        isOpen={showAIGenerator}
+        onClose={() => setShowAIGenerator(false)}
       />
 
       {selectedPalette && (
