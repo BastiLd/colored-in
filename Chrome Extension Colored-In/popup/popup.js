@@ -357,13 +357,14 @@ function renderPalettes(palettes, container) {
   container.innerHTML = '';
   
   palettes.forEach((palette, index) => {
+    const normalizedPalette = normalizePaletteForDisplay(palette);
     const card = document.createElement('div');
     card.className = 'palette-card';
     
     const colorsDiv = document.createElement('div');
     colorsDiv.className = 'palette-colors';
     
-    palette.colors.forEach(color => {
+    normalizedPalette.colors.forEach(color => {
       const colorDiv = document.createElement('div');
       colorDiv.className = 'palette-color';
       colorDiv.style.backgroundColor = color;
@@ -377,21 +378,64 @@ function renderPalettes(palettes, container) {
     
     const nameSpan = document.createElement('span');
     nameSpan.className = 'palette-name';
-    nameSpan.textContent = palette.name || `Palette ${index + 1}`;
-    nameSpan.addEventListener('click', () => showPaletteDetail(palette));
+    nameSpan.textContent = normalizedPalette.name || `Palette ${index + 1}`;
+    nameSpan.addEventListener('click', () => showPaletteDetail(normalizedPalette));
     
     const descSpan = document.createElement('p');
     descSpan.className = 'palette-description';
-    descSpan.textContent = palette.description || '';
+    descSpan.textContent = normalizedPalette.description || '';
     
     infoDiv.appendChild(nameSpan);
-    if (palette.description) {
+    if (normalizedPalette.description) {
       infoDiv.appendChild(descSpan);
     }
     
     card.appendChild(colorsDiv);
     card.appendChild(infoDiv);
     container.appendChild(card);
+  });
+}
+
+function normalizePaletteForDisplay(palette) {
+  if (!palette || !Array.isArray(palette.colors)) return palette;
+  const tags = Array.isArray(palette.tags) ? palette.tags : [];
+  const isImprove = tags.includes('improve') || tags.includes('improved');
+  const descriptions = Array.isArray(palette.colorDescriptions) ? palette.colorDescriptions : [];
+
+  if (descriptions.length === palette.colors.length) {
+    return palette;
+  }
+
+  const fallback = buildFallbackDescriptions(palette.colors, isImprove);
+  return { ...palette, colorDescriptions: fallback };
+}
+
+function buildFallbackDescriptions(colors, isImprove) {
+  if (isImprove) {
+    const replaceTemplates = [
+      "Replace the primary brand color with this option to improve recognition and trust.",
+      "Replace the secondary/support color with this tone to add depth and balance.",
+      "Replace the CTA/accent color with this shade to increase focus on key actions.",
+      "Replace the background/neutral color with this to improve readability.",
+      "Replace the text/contrast color with this value to strengthen legibility.",
+    ];
+    return colors.map((color, index) => {
+      const template = replaceTemplates[index] || replaceTemplates[replaceTemplates.length - 1];
+      return `${template} (${color})`;
+    });
+  }
+
+  const roleTemplates = [
+    "This primary color anchors the palette and sets the visual tone.",
+    "This secondary color supports the primary and adds depth.",
+    "This accent color provides contrast and draws attention to key elements.",
+    "This background/neutral color improves readability and balance.",
+    "This highlight color adds subtle emphasis and polish.",
+  ];
+
+  return colors.map((color, index) => {
+    const template = roleTemplates[index] || roleTemplates[roleTemplates.length - 1];
+    return `${template} (${color})`;
   });
 }
 
