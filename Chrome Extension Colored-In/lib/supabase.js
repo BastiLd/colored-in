@@ -104,34 +104,59 @@ const SupabaseClient = {
 
   async createSignedUrl(bucket, path, expiresIn = 3600) {
     await this.ensureConfig();
-    if (!path) return null;
+    if (!path) {
+      console.warn('[SupabaseClient] createSignedUrl: No path provided');
+      return null;
+    }
     await this.ensureAuth();
+    
     const cacheKey = `${bucket}:${path}:${expiresIn}`;
     const cached = this.signedUrlCache.get(cacheKey);
     if (cached && cached.expiresAt && cached.expiresAt > Date.now() + 30_000 && cached.url) {
+      console.log('[SupabaseClient] Using cached signed URL for:', path);
       return cached.url;
     }
+    
     const safePath = this.encodeStoragePath(path);
-    const response = await fetch(`${this.url}/storage/v1/object/sign/${bucket}/${safePath}`, {
-      method: 'POST',
-      headers: {
-        ...this.getHeaders(true),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ expiresIn }),
-    });
+    console.log('[SupabaseClient] Creating signed URL for bucket:', bucket, 'path:', safePath);
+    
+    try {
+      const response = await fetch(`${this.url}/storage/v1/object/sign/${bucket}/${safePath}`, {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(true),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ expiresIn }),
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[SupabaseClient] Failed to create signed URL:', response.status, errorText);
+        return null;
+      }
+
+      const data = await response.json();
+      const signedUrl = data?.signedUrl || data?.signedURL || data?.signed_url;
+      if (!signedUrl) {
+        console.error('[SupabaseClient] No signed URL in response:', data);
+        return null;
+      }
+      
+      let full;
+      if (signedUrl.startsWith('http')) {
+        full = signedUrl;
+      } else {
+        full = `${this.url}${signedUrl.startsWith('/') ? '' : '/'}${signedUrl}`;
+      }
+      
+      console.log('[SupabaseClient] Created signed URL:', full);
+      this.signedUrlCache.set(cacheKey, { url: full, expiresAt: Date.now() + expiresIn * 1000 });
+      return full;
+    } catch (error) {
+      console.error('[SupabaseClient] Error creating signed URL:', error);
       return null;
     }
-
-    const data = await response.json();
-    const signedUrl = data?.signedUrl || data?.signedURL || data?.signed_url;
-    if (!signedUrl) return null;
-    if (signedUrl.startsWith('http')) return signedUrl;
-    const full = `${this.url}${signedUrl.startsWith('/') ? '' : '/'}${signedUrl}`;
-    this.signedUrlCache.set(cacheKey, { url: full, expiresAt: Date.now() + expiresIn * 1000 });
-    return full;
   },
 
   async ensureAuth() {
@@ -264,18 +289,29 @@ const SupabaseClient = {
   async getUserPalettes(userId) {
     await this.ensureConfig();
     await this.ensureAuth();
-    const response = await fetch(
-      `${this.url}/rest/v1/public_palettes?created_by=eq.${userId}&select=id,name,colors,tags,description,color_descriptions&order=created_at.desc`,
-      {
+    
+    console.log('[SupabaseClient] Fetching palettes for user:', userId);
+    const url = `${this.url}/rest/v1/public_palettes?created_by=eq.${userId}&select=id,name,colors,tags,description,color_descriptions&order=created_at.desc`;
+    console.log('[SupabaseClient] Request URL:', url);
+    
+    try {
+      const response = await fetch(url, {
         headers: this.getHeaders(true),
-      }
-    );
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[SupabaseClient] Failed to fetch palettes:', response.status, errorText);
+        return [];
+      }
+
+      const data = await response.json();
+      console.log('[SupabaseClient] Fetched palettes:', data);
+      return data;
+    } catch (error) {
+      console.error('[SupabaseClient] Error fetching palettes:', error);
       return [];
     }
-
-    return await response.json();
   },
 
   // Save a link or image asset record

@@ -481,22 +481,28 @@ async function hydrateAssetsForDisplay(assets) {
     assets.map(async (asset) => {
       if (asset.type !== 'image') return asset;
       
+      console.log('Processing asset:', asset.id, 'URL:', asset.url);
+      
       // If already a signed URL, use it
       if (asset.url?.includes('/storage/v1/object/sign/')) {
+        console.log('Asset already has signed URL');
         return { ...asset, displayUrl: asset.url };
       }
       
       // If it's a data URL or blob URL, use it directly
       if (asset.url?.startsWith('data:') || asset.url?.startsWith('blob:')) {
+        console.log('Asset is data/blob URL');
         return { ...asset, displayUrl: asset.url };
       }
       
       // Try to get storage path from URL
       let path = SupabaseClient.getStoragePathFromUrl(asset.url);
+      console.log('Extracted path:', path);
       
       // If path extraction failed, try using the URL directly as path if it looks like a path
       if (!path && asset.url && !asset.url.startsWith('http') && asset.url.includes('/')) {
         path = asset.url;
+        console.log('Using URL directly as path:', path);
       }
       
       if (!path) {
@@ -505,17 +511,23 @@ async function hydrateAssetsForDisplay(assets) {
         return { ...asset, displayUrl: asset.url };
       }
       
-      // Prefer a stable public URL to avoid flicker (bucket is intended to be public).
-      const publicUrl = SupabaseClient.getPublicUrl(bucket, path);
-      if (publicUrl) {
-        return { ...asset, displayUrl: publicUrl };
-      }
-
-      // Fallback to signed URL (cached in SupabaseClient to reduce flicker)
+      // Always use signed URL for better compatibility with Chrome Extension context
+      console.log('Creating signed URL for path:', path);
       const signedUrl = await SupabaseClient.createSignedUrl(bucket, path, 60 * 60);
-      return { ...asset, displayUrl: signedUrl || asset.url };
+      console.log('Signed URL:', signedUrl);
+      
+      if (!signedUrl) {
+        console.error('Failed to create signed URL for:', path);
+        // Fallback to public URL
+        const publicUrl = SupabaseClient.getPublicUrl(bucket, path);
+        console.log('Fallback to public URL:', publicUrl);
+        return { ...asset, displayUrl: publicUrl || asset.url };
+      }
+      
+      return { ...asset, displayUrl: signedUrl };
     })
   );
+  console.log('Hydrated assets:', hydrated);
   return hydrated;
 }
 
@@ -606,23 +618,41 @@ function renderAssets(assets, targetList) {
 }
 
 async function loadUserPalettes() {
-  if (!state.user) return;
-  if (!elements.palettesList) return;
+  if (!state.user) {
+    console.error('No user found in state');
+    return;
+  }
+  if (!elements.palettesList) {
+    console.error('Palettes list element not found');
+    return;
+  }
 
   elements.palettesList.innerHTML = '<p class="loading-text">Loading palettes...</p>';
 
   try {
+    console.log('Ensuring config before loading palettes...');
     await SupabaseClient.ensureConfig();
+    console.log('Loading palettes for user:', state.user.id);
     const palettes = await SupabaseClient.getUserPalettes(state.user.id);
+    console.log('Loaded palettes:', palettes);
+    
+    if (!palettes || palettes.length === 0) {
+      elements.palettesList.innerHTML = '<p class="loading-text">No saved palettes yet. Generate some palettes to see them here!</p>';
+      return [];
+    }
+    
     const normalized = palettes.map((palette) => ({
       ...palette,
       colorDescriptions: palette.color_descriptions || palette.colorDescriptions || [],
     }));
+    console.log('Rendering', normalized.length, 'palettes');
     renderPalettes(normalized, elements.palettesList);
     return normalized;
   } catch (error) {
-    console.error('Failed to load palettes:', error);
-    elements.palettesList.innerHTML = '<p class="loading-text">Failed to load palettes</p>';
+    console.error('Failed to load palettes - Full error:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    elements.palettesList.innerHTML = '<p class="loading-text">Failed to load palettes. Check console for details.</p>';
     return [];
   }
 }
