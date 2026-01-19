@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { X, Copy, Code, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
-import { Palette } from "@/data/palettes";
+import { type Palette } from "@/data/palettes";
 import {
   DropdownMenu,
   DropdownMenuContent,
