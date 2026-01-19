@@ -62,11 +62,28 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
         if (!error && data?.signedUrl) {
           return { ...asset, displayUrl: data.signedUrl };
         }
+        const encodedPath = path.includes("/") ? encodeURIComponent(path) : null;
+        if (encodedPath) {
+          const { data: encodedData } = await supabase.storage
+            .from(USER_ASSETS_BUCKET)
+            .createSignedUrl(encodedPath, 60 * 60);
+          if (encodedData?.signedUrl) {
+            return { ...asset, displayUrl: encodedData.signedUrl };
+          }
+        }
         const { data: publicData } = supabase.storage
           .from(USER_ASSETS_BUCKET)
           .getPublicUrl(path);
         if (publicData?.publicUrl) {
           return { ...asset, displayUrl: publicData.publicUrl };
+        }
+        if (encodedPath) {
+          const { data: encodedPublic } = supabase.storage
+            .from(USER_ASSETS_BUCKET)
+            .getPublicUrl(encodedPath);
+          if (encodedPublic?.publicUrl) {
+            return { ...asset, displayUrl: encodedPublic.publicUrl };
+          }
         }
         return { ...asset, displayUrl: asset.url };
       })
