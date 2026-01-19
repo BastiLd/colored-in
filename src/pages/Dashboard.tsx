@@ -336,7 +336,7 @@ const Dashboard = () => {
         if (isPaidPlan) {
           return (
             <ProPaletteBuilder
-              onBrowse={() => setCurrentView("explore")}
+              onBrowse={() => navigate("/explore")}
               onHome={() => setCurrentView("home")}
               onOldDesign={() => setCurrentView("generator-old")}
             />
@@ -345,7 +345,7 @@ const Dashboard = () => {
         // Free plan gets the classic generator
         return (
           <PaletteGenerator
-            onBrowse={() => setCurrentView("explore")}
+            onBrowse={() => navigate("/explore")}
             onHome={() => setCurrentView("home")}
           />
         );
