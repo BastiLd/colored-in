@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef, memo } from "react";
 import { Search, ArrowLeft, Lock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Palette, getPalettesByPlan, searchAllPalettesAsync } from "@/data/palettes";
+import { type Palette, getPalettesByPlan, searchAllPalettesAsync } from "@/data/palettes";
 import { Input } from "@/components/ui/input";
 import { PaletteModal } from "./PaletteModal";
 import { supabase } from "@/integrations/supabase/client";

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Send, X, Sparkles, Loader2, LogIn, Upload, Image as ImageIcon, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getFreePalettes, Palette } from "@/data/palettes";
+import { getFreePalettes, type Palette } from "@/data/palettes";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
