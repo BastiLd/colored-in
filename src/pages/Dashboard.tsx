@@ -262,14 +262,33 @@ const Dashboard = () => {
   const fetchUserPalettes = async (userId: string) => {
     setLoadingPalettes(true);
     try {
-      const { data, error } = await supabase
-        .from("public_palettes")
-        .select("id, name, colors, tags, created_at, description, color_descriptions")
-        .eq("created_by", userId)
-        .order("created_at", { ascending: false });
+      const trySelect = async (select: string) => {
+        const { data, error } = await supabase
+          .from("public_palettes")
+          .select(select)
+          .eq("created_by", userId)
+          .order("created_at", { ascending: false });
+        return { data, error };
+      };
 
-      if (error) throw error;
-      setUserPalettes(data || []);
+      // Some deployments don't have `description` / `color_descriptions` columns yet.
+      // Try the richer select first, then fall back to a minimal one.
+      const primary = await trySelect(
+        "id, name, colors, tags, created_at, description, color_descriptions"
+      );
+
+      const isMissingColumn =
+        (primary.error as any)?.code === "42703" ||
+        String((primary.error as any)?.message || "").includes("does not exist");
+
+      if (primary.error && isMissingColumn) {
+        const fallback = await trySelect("id, name, colors, tags, created_at");
+        if (fallback.error) throw fallback.error;
+        setUserPalettes((fallback.data as any[]) || []);
+      } else {
+        if (primary.error) throw primary.error;
+        setUserPalettes((primary.data as any[]) || []);
+      }
     } catch (error) {
       console.error("Error fetching user palettes:", error);
       toast.error("Failed to load palettes");

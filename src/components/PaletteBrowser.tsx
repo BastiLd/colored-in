@@ -162,10 +162,22 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
       pageRef.current = 1;
 
       // Load user-created palettes from database
-      const { data: userPalettes } = await supabase
-        .from("public_palettes")
-        .select("id, name, colors, tags, description, color_descriptions")
-        .order("created_at", { ascending: false });
+      const trySelect = async (select: string) => {
+        const { data, error } = await supabase
+          .from("public_palettes")
+          .select(select)
+          .order("created_at", { ascending: false });
+        return { data, error };
+      };
+
+      const primary = await trySelect("id, name, colors, tags, description, color_descriptions");
+      const isMissingColumn =
+        (primary.error as any)?.code === "42703" ||
+        String((primary.error as any)?.message || "").includes("does not exist");
+
+      const userPalettes = primary.error && isMissingColumn
+        ? (await trySelect("id, name, colors, tags")).data
+        : primary.data;
 
       if (userPalettes) {
         dbPalettesRef.current = userPalettes.map(p => ({
@@ -173,8 +185,8 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
           name: p.name,
           colors: p.colors,
           tags: p.tags,
-          description: p.description ?? undefined,
-          colorDescriptions: p.color_descriptions ?? undefined,
+          description: (p as any).description ?? undefined,
+          colorDescriptions: (p as any).color_descriptions ?? undefined,
           isFree: true
         }));
       }

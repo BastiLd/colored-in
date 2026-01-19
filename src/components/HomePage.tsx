@@ -5,7 +5,7 @@ import { getFreePalettes, type Palette } from "@/data/palettes";
 import { AIPaletteGenerator } from "./AIPaletteGenerator";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { LogOut, User as UserIcon, Sparkles, Palette as PaletteIcon } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -494,7 +494,7 @@ export function HomePage({
                     ))}
                   </div>
                   <div className="h-1/2 bg-muted/50 flex items-center justify-center">
-                    <Palette className="w-12 h-12 text-primary/50" />
+                    <PaletteIcon className="w-12 h-12 text-primary/50" />
                   </div>
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
