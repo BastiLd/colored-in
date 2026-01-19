@@ -322,7 +322,7 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
         <div className="min-w-0 flex-1 overflow-hidden flex flex-col">
           <p className="text-xs font-medium text-muted-foreground mb-2 flex-shrink-0">Your Images</p>
           <ScrollArea className="flex-1 min-h-0">
-            <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
+            <div className="grid gap-2 grid-cols-[repeat(auto-fit,minmax(96px,1fr))]">
             {imageAssets.map((asset) => {
               const isSelected = selectedAssetId === asset.id;
               const isAnalyzing = analyzingAssetId === asset.id;
@@ -453,7 +453,7 @@ export function AssetsPanel({ userId, userPlan, onPaletteGenerated }: AssetsPane
               return (
                 <div
                   key={asset.id}
-                  className={`flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${
+                  className={`flex flex-wrap items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${
                     isSelected 
                       ? "border-primary bg-primary/5 ring-2 ring-primary/30" 
                       : "border-border bg-muted/50 hover:border-primary/50"
