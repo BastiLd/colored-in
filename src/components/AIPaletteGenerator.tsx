@@ -78,6 +78,53 @@ function findSimilarPalettes(generatedColors: string[], allPalettes: Palette[], 
     .map(p => p.palette);
 }
 
+function buildFallbackDescriptions(colors: string[]): string[] {
+  const roleTemplates = [
+    "This primary color anchors the palette and sets the visual tone.",
+    "This secondary color supports the primary and adds depth.",
+    "This accent color provides contrast and draws attention to key elements.",
+    "This background/neutral color improves readability and balance.",
+    "This highlight color adds subtle emphasis and polish.",
+  ];
+
+  return colors.map((color, index) => {
+    const template = roleTemplates[index] || roleTemplates[roleTemplates.length - 1];
+    return `${template} (${color})`;
+  });
+}
+
+function buildImproveDescriptions(colors: string[]): string[] {
+  const replaceTemplates = [
+    "Replace the primary brand color with this option to improve recognition and trust.",
+    "Replace the secondary/support color with this tone to add depth and balance.",
+    "Replace the CTA/accent color with this shade to increase focus on key actions.",
+    "Replace the background/neutral color with this to improve readability.",
+    "Replace the text/contrast color with this value to strengthen legibility.",
+  ];
+
+  return colors.map((color, index) => {
+    const template = replaceTemplates[index] || replaceTemplates[replaceTemplates.length - 1];
+    return `${template} (${color})`;
+  });
+}
+
+function normalizePaletteDescriptions(palette: GeneratedPalette): GeneratedPalette {
+  const tags = palette.tags || [];
+  const isImprove = tags.includes("improve") || tags.includes("improved");
+  const descriptions = palette.colorDescriptions || [];
+
+  if (descriptions.length === palette.colors.length) {
+    return palette;
+  }
+
+  return {
+    ...palette,
+    colorDescriptions: isImprove
+      ? buildImproveDescriptions(palette.colors)
+      : buildFallbackDescriptions(palette.colors),
+  };
+}
+
 // Orbiting palette component for LEFT side
 function OrbitingPaletteLeft({ 
   palette, 
@@ -322,7 +369,7 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
         throw new Error("Invalid response from server");
       }
 
-      setGeneratedPalette(data);
+      setGeneratedPalette(normalizePaletteDescriptions(data));
       setGenerationCount(prev => prev + 1);
       // Check if new count reaches limit
       const limit = PLAN_LIMITS[userPlan] ?? PLAN_LIMITS.free;
@@ -354,8 +401,9 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
   };
 
   const copyAllColors = () => {
-    if (!generatedPalette) return;
-    navigator.clipboard.writeText(generatedPalette.colors.join(", "));
+    const palette = improvedPalette || generatedPalette;
+    if (!palette) return;
+    navigator.clipboard.writeText(palette.colors.join(", "));
     toast.success("Copied all colors!", { duration: 1500 });
   };
 
@@ -407,13 +455,14 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
       }
 
       if (data?.colors && Array.isArray(data.colors)) {
-        setImprovedPalette({
+        const improved = normalizePaletteDescriptions({
           name: data.name || 'Improved Logo Palette',
           colors: data.colors,
           tags: data.tags || ['improved', 'logo'],
           description: data.description,
           colorDescriptions: data.colorDescriptions || [],
         });
+        setImprovedPalette(improved);
         toast.success("Logo improved and palette generated!");
       } else {
         throw new Error("Invalid response from server");
