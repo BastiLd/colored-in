@@ -147,14 +147,19 @@ const Dashboard = () => {
   };
 
   const handleSelectPalette = (colors: string[]) => {
-    setCurrentView("generator");
+    handleViewChange("generator");
   };
 
   const handleViewChange = (view: string) => {
-    setCurrentView(view as DashboardView);
-    if (view === "my-palettes" && user) {
+    const nextView = view as DashboardView;
+    setCurrentView(nextView);
+    const nextUrl = nextView === "home" ? "/dashboard" : `/dashboard?view=${nextView}`;
+    if (`${location.pathname}${location.search}` !== nextUrl) {
+      navigate(nextUrl);
+    }
+    if (nextView === "my-palettes" && user) {
       fetchUserPalettes(user.id);
-    } else if (view === "uploads" && user) {
+    } else if (nextView === "uploads" && user) {
       fetchUserAssets(user.id);
     }
   };
@@ -356,8 +361,8 @@ const Dashboard = () => {
           return (
             <ProPaletteBuilder
               onBrowse={() => navigate("/explore")}
-              onHome={() => setCurrentView("home")}
-              onOldDesign={() => setCurrentView("generator-old")}
+              onHome={() => handleViewChange("home")}
+              onOldDesign={() => handleViewChange("generator-old")}
             />
           );
         }
@@ -365,7 +370,7 @@ const Dashboard = () => {
         return (
           <PaletteGenerator
             onBrowse={() => navigate("/explore")}
-            onHome={() => setCurrentView("home")}
+            onHome={() => handleViewChange("home")}
           />
         );
       case "generator-old":
@@ -373,8 +378,8 @@ const Dashboard = () => {
         return (
           <PaletteGenerator
             onBrowse={() => navigate("/explore")}
-            onHome={() => setCurrentView("home")}
-            onNewDesign={() => setCurrentView("generator")}
+            onHome={() => handleViewChange("home")}
+            onNewDesign={() => handleViewChange("generator")}
             showNewDesignButton={true}
           />
         );
@@ -417,7 +422,7 @@ const Dashboard = () => {
             {/* Quick Actions */}
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
               <button
-                onClick={() => setCurrentView("generator")}
+                onClick={() => handleViewChange("generator")}
                 className="p-6 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors text-left group"
                 data-tour="dashboard-manual"
               >
@@ -459,7 +464,7 @@ const Dashboard = () => {
               </button>
 
               <button
-                onClick={() => setCurrentView("my-palettes")}
+                onClick={() => handleViewChange("my-palettes")}
                 className="p-6 bg-card border border-border rounded-xl hover:border-primary/50 transition-colors text-left group"
                 data-tour="dashboard-palettes"
               >
@@ -516,7 +521,7 @@ const Dashboard = () => {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">My Palettes</h2>
               <button
-                onClick={() => setCurrentView("generator")}
+                onClick={() => handleViewChange("generator")}
                 className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
               >
                 Create Palette
@@ -535,7 +540,9 @@ const Dashboard = () => {
                   Start creating or saving palettes to see them here.
                 </p>
                 <button
-                  onClick={() => setCurrentView("generator")}
+                  onClick={() => handleViewChange("generator")}
+                <button
+                  onClick={() => handleViewChange("generator")}
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
                 >
                   Create Palette
@@ -615,7 +622,7 @@ const Dashboard = () => {
                   Upload images or add links in the Manual Builder to see them here.
                 </p>
                 <button
-                  onClick={() => setCurrentView("generator")}
+                  onClick={() => handleViewChange("generator")}
                   className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
                 >
                   Go to Manual Builder
