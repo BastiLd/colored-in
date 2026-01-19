@@ -291,7 +291,8 @@ const SupabaseClient = {
     await this.ensureAuth();
     
     console.log('[SupabaseClient] Fetching palettes for user:', userId);
-    const url = `${this.url}/rest/v1/public_palettes?created_by=eq.${userId}&select=id,name,colors,tags,description,color_descriptions&order=created_at.desc`;
+    // Only select columns that exist in the database
+    const url = `${this.url}/rest/v1/public_palettes?created_by=eq.${userId}&select=id,name,colors,tags&order=created_at.desc`;
     console.log('[SupabaseClient] Request URL:', url);
     
     try {
