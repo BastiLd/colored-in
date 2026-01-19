@@ -56,6 +56,22 @@ function buildFallbackColorDescriptions(colors: string[]): string[] {
   });
 }
 
+function buildImproveFallbackDescriptions(colors: string[]): string[] {
+  const replaceTemplates = [
+    "Replace the primary brand color with this option to improve recognition and trust.",
+    "Replace the secondary/support color with this tone to add depth and balance.",
+    "Replace the CTA/accent color with this shade to increase focus on key actions.",
+    "Replace the background/neutral color with this to improve readability and spacing.",
+    "Replace the text/contrast color with this value to strengthen legibility.",
+    "Replace supporting UI elements with this color to keep the palette cohesive.",
+  ];
+
+  return colors.map((color, index) => {
+    const template = replaceTemplates[index] || replaceTemplates[replaceTemplates.length - 1];
+    return `${template} (${color})`;
+  });
+}
+
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -345,11 +361,11 @@ Return ONLY a valid JSON object in this exact format (no markdown, no explanatio
 {
   "colors": ["#HEX1", "#HEX2", "#HEX3", "#HEX4", "#HEX5"],
   "colorDescriptions": [
-    "Why this primary color works: explanation of psychological impact and usage",
-    "Why this secondary color works: explanation",
-    "Why this accent color works: explanation",
-    "Why this background/neutral works: explanation",
-    "Why this highlight color works: explanation"
+    "Replace the current primary color with #HEX1 and explain what it improves",
+    "Replace the current secondary color with #HEX2 and explain the benefit",
+    "Replace the current accent/CTA color with #HEX3 and explain the impact",
+    "Replace the current background/neutral with #HEX4 and explain readability gains",
+    "Replace the current text/contrast color with #HEX5 and explain legibility improvements"
   ],
   "name": "Improved Palette Name",
   "description": "Overall explanation of how this palette improves upon the original"
@@ -357,7 +373,7 @@ Return ONLY a valid JSON object in this exact format (no markdown, no explanatio
 
 Rules:
 - Create exactly 5 colors that would IMPROVE the design
-- Each colorDescription must explain WHY that color is better and what psychological/emotional effect it creates
+- Each colorDescription must explicitly say what should be replaced and why the new color is better
 - Reference color theory, psychology, and UX best practices
 - Use uppercase hex codes with # prefix
 - Name should suggest improvement/enhancement
@@ -374,11 +390,11 @@ Return ONLY a valid JSON object in this exact format (no markdown, no explanatio
 {
   "colors": ["#HEX1", "#HEX2", "#HEX3", "#HEX4", "#HEX5"],
   "colorDescriptions": [
-    "Why this primary color works: explanation of psychological impact and brand alignment",
-    "Why this secondary color works: explanation",
-    "Why this accent/CTA color works: explanation",
-    "Why this background color works: explanation",
-    "Why this text/contrast color works: explanation"
+    "Replace the current primary brand color with #HEX1 and explain the improvement",
+    "Replace the current secondary/support color with #HEX2 and explain the benefit",
+    "Replace the current accent/CTA color with #HEX3 and explain conversion impact",
+    "Replace the current background color with #HEX4 and explain readability gains",
+    "Replace the current text/contrast color with #HEX5 and explain legibility improvements"
   ],
   "name": "Improved Palette Name",
   "description": "Overall explanation of how this palette improves the website's effectiveness"
@@ -386,7 +402,7 @@ Return ONLY a valid JSON object in this exact format (no markdown, no explanatio
 
 Rules:
 - Create exactly 5 colors that would IMPROVE the website's design
-- Each colorDescription must explain WHY that color is better and what effect it creates
+- Each colorDescription must explicitly say what should be replaced and why the new color is better
 - Consider the industry, target audience, and conversion goals
 - Use uppercase hex codes with # prefix
 - Reference color psychology, UX best practices, and brand strategy`;
@@ -491,7 +507,10 @@ Rules:
 
     const normalizedColors = response.colors as string[];
     if (!Array.isArray(parsedPalette.colorDescriptions) || parsedPalette.colorDescriptions.length !== normalizedColors.length) {
-      response.colorDescriptions = buildFallbackColorDescriptions(normalizedColors);
+      response.colorDescriptions =
+        mode === 'improve'
+          ? buildImproveFallbackDescriptions(normalizedColors)
+          : buildFallbackColorDescriptions(normalizedColors);
     } else {
       response.colorDescriptions = parsedPalette.colorDescriptions;
     }
