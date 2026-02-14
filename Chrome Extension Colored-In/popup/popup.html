@@ -93,6 +93,32 @@
           </svg>
           <span>My Palettes</span>
         </button>
+        <div class="menu-divider"></div>
+        <span class="menu-label">Individual</span>
+        <button id="menu-notes" class="menu-item individual-only">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          <span>Notes</span>
+        </button>
+        <button id="menu-site-mode" class="menu-item individual-only">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span>Site Mode</span>
+        </button>
+        <button id="menu-contact" class="menu-item individual-only">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+            <polyline points="22,6 12,13 2,6"></polyline>
+          </svg>
+          <span>Contact / Feedback</span>
+        </button>
       </nav>
       <div class="menu-footer">
         <button id="logout-btn" class="menu-item logout">
@@ -139,7 +165,7 @@
           </form>
           
           <div class="color-picker-hint">
-            <p>Press <kbd>SHIFT</kbd>+<kbd>C</kbd> to pick any color</p>
+            <p>Press <kbd>ALT</kbd>+<kbd>SHIFT</kbd>+<kbd>C</kbd> to pick any color</p>
           </div>
         </div>
       </div>
@@ -154,12 +180,12 @@
               <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
             </svg>
             <h2>Premium Feature</h2>
-            <p id="blur-text">You need an Ultra or Individual plan to use this extension.</p>
+            <p id="blur-text">Du brauchst einen Ultra oder Individuell Plan um die Extension nutzen zu können.</p>
             <button id="upgrade-btn" class="btn-primary">View Plans</button>
           </div>
         </div>
         <div class="color-picker-hint">
-          <p>Press <kbd>SHIFT</kbd>+<kbd>C</kbd> to pick any color</p>
+          <p>mit <kbd>ALT</kbd>+<kbd>SHIFT</kbd>+<kbd>C</kbd> kannst du einen Color Picker starten.</p>
         </div>
       </div>
 
@@ -209,7 +235,7 @@
         </div>
         
         <div class="color-picker-hint">
-          <p>Press <kbd>SHIFT</kbd>+<kbd>C</kbd> to pick any color</p>
+          <p>Press <kbd>ALT</kbd>+<kbd>SHIFT</kbd>+<kbd>C</kbd> to pick any color</p>
         </div>
       </div>
 
@@ -328,6 +354,138 @@
         </div>
         <div class="palettes-content">
           <div id="palettes-list" class="palette-list"></div>
+        </div>
+      </div>
+
+      <!-- Notes View (Individual Plan) -->
+      <div id="notes-view" class="view hidden">
+        <div class="view-header">
+          <button id="notes-back-btn" class="back-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <h2>Notes</h2>
+          <div class="view-header-actions">
+            <button id="notes-download-btn" class="header-btn-small" title="Download as TXT">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+            </button>
+            <button id="notes-add-btn" class="header-btn-small" title="New Note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div id="notes-list" class="notes-grid">
+          <p class="loading-text">Loading notes...</p>
+        </div>
+      </div>
+
+      <!-- Note Editor Modal -->
+      <div id="note-editor-modal" class="modal hidden">
+        <div class="modal-content note-editor">
+          <div class="modal-header">
+            <h3 id="note-editor-title">New Note</h3>
+            <button id="close-note-editor" class="close-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="modal-body">
+            <input type="text" id="note-title-input" placeholder="Note title..." class="note-input">
+            <textarea id="note-content-input" placeholder="Write your note..." rows="6" class="note-textarea"></textarea>
+            <div class="note-color-picker">
+              <label>Color:</label>
+              <div class="note-colors">
+                <button class="note-color-btn active" data-color="#a78bfa" style="background:#a78bfa"></button>
+                <button class="note-color-btn" data-color="#f472b6" style="background:#f472b6"></button>
+                <button class="note-color-btn" data-color="#60a5fa" style="background:#60a5fa"></button>
+                <button class="note-color-btn" data-color="#34d399" style="background:#34d399"></button>
+                <button class="note-color-btn" data-color="#fbbf24" style="background:#fbbf24"></button>
+                <button class="note-color-btn" data-color="#fb923c" style="background:#fb923c"></button>
+              </div>
+            </div>
+            <button id="save-note-btn" class="btn-primary">Save Note</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Site Mode View (Individual Plan) -->
+      <div id="site-mode-view" class="view hidden">
+        <div class="view-header">
+          <button id="site-mode-back-btn" class="back-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <h2>Site Mode</h2>
+        </div>
+        <div class="site-mode-content">
+          <p class="site-mode-desc">Describe your website and get AI-powered palette, theme, and content suggestions.</p>
+          <div class="form-group">
+            <label for="site-topic">Topic / Industry</label>
+            <input type="text" id="site-topic" placeholder="e.g., Tech Startup, Restaurant, Fashion..." class="note-input">
+          </div>
+          <div class="form-group">
+            <label for="site-audience">Target Audience</label>
+            <input type="text" id="site-audience" placeholder="e.g., Young professionals, Families..." class="note-input">
+          </div>
+          <div class="form-group">
+            <label for="site-style">Style</label>
+            <input type="text" id="site-style" placeholder="e.g., Modern, Minimalist, Playful..." class="note-input">
+          </div>
+          <div class="form-group">
+            <label for="site-additional">Additional Info (optional)</label>
+            <textarea id="site-additional" placeholder="Any extra details..." rows="2" class="note-textarea"></textarea>
+          </div>
+          <button id="site-generate-btn" class="btn-primary">
+            <span>Generate Theme</span>
+            <div class="spinner hidden"></div>
+          </button>
+          <p id="site-error" class="error-message hidden"></p>
+          <div id="site-results" class="site-results"></div>
+        </div>
+      </div>
+
+      <!-- Contact View (Individual Plan) -->
+      <div id="contact-view" class="view hidden">
+        <div class="view-header">
+          <button id="contact-back-btn" class="back-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </button>
+          <h2>Contact / Feedback</h2>
+        </div>
+        <div class="contact-content">
+          <p class="contact-desc">Send us questions, feedback, or feature requests.</p>
+          <div class="form-group">
+            <label for="contact-category">Category</label>
+            <select id="contact-category" class="note-input">
+              <option value="question">Question</option>
+              <option value="feedback">Feedback</option>
+              <option value="feature">Feature Request</option>
+              <option value="bug">Bug Report</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="contact-subject">Subject</label>
+            <input type="text" id="contact-subject" placeholder="What's this about?" class="note-input">
+          </div>
+          <div class="form-group">
+            <label for="contact-message">Message</label>
+            <textarea id="contact-message" placeholder="Tell us more..." rows="5" class="note-textarea"></textarea>
+          </div>
+          <button id="contact-send-btn" class="btn-primary">Send Message</button>
+          <p class="contact-email-hint">Or email us directly at bastian.klaus2010@gmail.com</p>
         </div>
       </div>
 

@@ -81,7 +81,7 @@ const SupabaseClient = {
     }
     try {
       const parsed = new URL(assetUrl);
-      const match = parsed.pathname.match(/\/storage\/v1\/object\/(?:public|sign)\/[^/]+\/(.+)$/);
+      const match = parsed.pathname.match(/\/storage\/v1\/object\/(?:public|sign|authenticated)\/[^/]+\/(.+)$/);
       if (match && match[1]) {
         return decodeURIComponent(match[1]);
       }
@@ -102,6 +102,30 @@ const SupabaseClient = {
     return `${this.url}/storage/v1/object/public/${bucket}/${safePath}`;
   },
 
+  normalizeSignedUrl: function (signedUrl) {
+    if (!signedUrl || typeof signedUrl !== 'string') return null;
+
+    // Relative URL returned by storage API (e.g. "/object/sign/..." or "object/sign/...")
+    if (!signedUrl.startsWith('http')) {
+      let rel = signedUrl.startsWith('/') ? signedUrl : `/${signedUrl}`;
+      if (rel.startsWith('/object/')) {
+        rel = `/storage/v1${rel}`;
+      }
+      return `${this.url}${rel}`;
+    }
+
+    // Absolute URL returned by storage API
+    try {
+      const parsed = new URL(signedUrl);
+      if (parsed.pathname.startsWith('/object/')) {
+        parsed.pathname = `/storage/v1${parsed.pathname}`;
+      }
+      return parsed.toString();
+    } catch {
+      return signedUrl;
+    }
+  },
+
   async createSignedUrl(bucket, path, expiresIn = 3600) {
     await this.ensureConfig();
     if (!path) {
@@ -113,8 +137,12 @@ const SupabaseClient = {
     const cacheKey = `${bucket}:${path}:${expiresIn}`;
     const cached = this.signedUrlCache.get(cacheKey);
     if (cached && cached.expiresAt && cached.expiresAt > Date.now() + 30_000 && cached.url) {
+      const normalizedCachedUrl = this.normalizeSignedUrl(cached.url);
+      if (normalizedCachedUrl && normalizedCachedUrl !== cached.url) {
+        this.signedUrlCache.set(cacheKey, { ...cached, url: normalizedCachedUrl });
+      }
       console.log('[SupabaseClient] Using cached signed URL for:', path);
-      return cached.url;
+      return normalizedCachedUrl || cached.url;
     }
     
     const safePath = this.encodeStoragePath(path);
@@ -142,12 +170,11 @@ const SupabaseClient = {
         console.error('[SupabaseClient] No signed URL in response:', data);
         return null;
       }
-      
-      let full;
-      if (signedUrl.startsWith('http')) {
-        full = signedUrl;
-      } else {
-        full = `${this.url}${signedUrl.startsWith('/') ? '' : '/'}${signedUrl}`;
+
+      const full = this.normalizeSignedUrl(signedUrl);
+      if (!full) {
+        console.error('[SupabaseClient] Could not normalize signed URL:', signedUrl);
+        return null;
       }
       
       console.log('[SupabaseClient] Created signed URL:', full);
@@ -208,10 +235,21 @@ const SupabaseClient = {
   // Get current session from storage
   async getSession() {
     const result = await chrome.storage.local.get('session');
-    if (result.session && result.session.expires_at > Date.now()) {
+    if (!result.session) return null;
+    
+    // If token hasn't expired, use it directly
+    if (result.session.expires_at > Date.now()) {
       this.accessToken = result.session.access_token;
       return result.session;
     }
+    
+    // Token expired - try to refresh it automatically
+    console.log('[SupabaseClient] Session expired, attempting refresh...');
+    const refreshed = await this.refreshSession();
+    if (refreshed) {
+      return await chrome.storage.local.get('session').then(r => r.session);
+    }
+    
     return null;
   },
 
@@ -286,28 +324,51 @@ const SupabaseClient = {
   },
 
   // Get user palettes
+  // Uses the same try-fallback pattern as the website Dashboard:
+  // try full columns first, fall back to basic columns if description/color_descriptions don't exist yet.
   async getUserPalettes(userId) {
     await this.ensureConfig();
     await this.ensureAuth();
     
     console.log('[SupabaseClient] Fetching palettes for user:', userId);
-    // Only select columns that exist in the database
-    const url = `${this.url}/rest/v1/public_palettes?created_by=eq.${userId}&select=id,name,colors,tags&order=created_at.desc`;
-    console.log('[SupabaseClient] Request URL:', url);
-    
-    try {
+
+    const trySelect = async (columns) => {
+      const url = `${this.url}/rest/v1/public_palettes?created_by=eq.${userId}&select=${columns}&order=created_at.desc`;
+      console.log('[SupabaseClient] Request URL:', url);
       const response = await fetch(url, {
         headers: this.getHeaders(true),
       });
+      return response;
+    };
 
+    try {
+      // Try with all columns (including description columns added in later migration)
+      let response = await trySelect('id,name,colors,tags,created_at,description,color_descriptions');
+      
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[SupabaseClient] Failed to fetch palettes:', response.status, errorText);
-        return [];
+        console.warn('[SupabaseClient] Full select failed:', response.status, errorText);
+        
+        // If column doesn't exist (42703), retry with basic columns only
+        const isMissingColumn = response.status === 400 && 
+          (errorText.includes('does not exist') || errorText.includes('42703'));
+        
+        if (isMissingColumn) {
+          console.log('[SupabaseClient] Falling back to basic columns...');
+          response = await trySelect('id,name,colors,tags,created_at');
+          
+          if (!response.ok) {
+            const fallbackError = await response.text();
+            console.error('[SupabaseClient] Fallback also failed:', response.status, fallbackError);
+            return [];
+          }
+        } else {
+          return [];
+        }
       }
 
       const data = await response.json();
-      console.log('[SupabaseClient] Fetched palettes:', data);
+      console.log('[SupabaseClient] Fetched', data.length, 'palettes');
       return data;
     } catch (error) {
       console.error('[SupabaseClient] Error fetching palettes:', error);
@@ -406,6 +467,95 @@ const SupabaseClient = {
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || 'Failed to analyze asset');
+    }
+
+    return await response.json();
+  },
+
+  // ====== Notes API ======
+
+  // Get user notes
+  async getUserNotes(userId) {
+    await this.ensureConfig();
+    await this.ensureAuth();
+    const response = await fetch(
+      `${this.url}/rest/v1/user_notes?user_id=eq.${userId}&select=*&order=updated_at.desc`,
+      { headers: this.getHeaders(true) }
+    );
+    if (!response.ok) return [];
+    return await response.json();
+  },
+
+  // Create a note
+  async createNote(payload) {
+    await this.ensureConfig();
+    await this.ensureAuth();
+    const response = await fetch(`${this.url}/rest/v1/user_notes`, {
+      method: 'POST',
+      headers: { ...this.getHeaders(true), Prefer: 'return=representation' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error('Failed to create note');
+    const data = await response.json();
+    return data?.[0] || null;
+  },
+
+  // Update a note
+  async updateNote(noteId, payload) {
+    await this.ensureConfig();
+    await this.ensureAuth();
+    const response = await fetch(
+      `${this.url}/rest/v1/user_notes?id=eq.${noteId}`,
+      {
+        method: 'PATCH',
+        headers: { ...this.getHeaders(true), Prefer: 'return=representation' },
+        body: JSON.stringify({ ...payload, updated_at: new Date().toISOString() }),
+      }
+    );
+    if (!response.ok) throw new Error('Failed to update note');
+    const data = await response.json();
+    return data?.[0] || null;
+  },
+
+  // Delete a note
+  async deleteNote(noteId) {
+    await this.ensureConfig();
+    await this.ensureAuth();
+    const response = await fetch(
+      `${this.url}/rest/v1/user_notes?id=eq.${noteId}`,
+      { method: 'DELETE', headers: this.getHeaders(true) }
+    );
+    if (!response.ok) throw new Error('Failed to delete note');
+  },
+
+  // ====== Site Mode API (reuses generate-palette with extended prompt) ======
+  async generateSiteTheme(siteInfo) {
+    await this.ensureConfig();
+    await this.ensureAuth();
+    const prompt = `Create a complete color theme for a website with these details:
+Topic/Industry: ${siteInfo.topic}
+Target Audience: ${siteInfo.audience}
+Style: ${siteInfo.style}
+Additional Info: ${siteInfo.additional || 'None'}
+
+Please create a palette that works as a complete website theme. Include colors for:
+- Primary brand color
+- Secondary/accent color  
+- Background color
+- Text color
+- Call-to-action color
+
+Also provide theme recommendations for fonts, spacing, and layout in the description.`;
+
+    const response = await fetch(`${this.url}/functions/v1/generate-palette`, {
+      method: 'POST',
+      headers: this.getHeaders(true),
+      body: JSON.stringify({ prompt }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to generate site theme');
     }
 
     return await response.json();

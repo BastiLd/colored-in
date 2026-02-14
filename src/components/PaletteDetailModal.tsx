@@ -1,5 +1,12 @@
-import { Copy, X } from "lucide-react";
+import { useState } from "react";
+import { Copy, X, Code, ChevronDown, Download, Image as ImageIcon, FileCode } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface PaletteDetailModalProps {
   palette: {
@@ -19,10 +26,103 @@ function getContrastColor(hex: string): string {
   return luminance > 0.5 ? "#000000" : "#FFFFFF";
 }
 
+function generateCSS(colors: string[]): string {
+  const lines = [":root {"];
+  colors.forEach((color, i) => { lines.push(`  --color-${i + 1}: ${color};`); });
+  lines.push("}");
+  return lines.join("\n");
+}
+
+function generateSCSS(colors: string[]): string {
+  return colors.map((color, i) => `$color-${i + 1}: ${color};`).join("\n");
+}
+
+function generateTailwind(colors: string[]): string {
+  const config: Record<string, string> = {};
+  colors.forEach((color, i) => { config[`palette-${i + 1}`] = color; });
+  return `// tailwind.config.js\nmodule.exports = ${JSON.stringify({ theme: { extend: { colors: config } } }, null, 2)}`;
+}
+
+function generateArray(colors: string[]): string {
+  return `const colors = ${JSON.stringify(colors, null, 2)};`;
+}
+
+function downloadFile(content: string, filename: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportAsPNG(colors: string[], name: string) {
+  const canvas = document.createElement("canvas");
+  const colorWidth = 120;
+  const height = 200;
+  canvas.width = colors.length * colorWidth;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  colors.forEach((color, i) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(i * colorWidth, 0, colorWidth, height);
+    ctx.fillStyle = getContrastColor(color);
+    ctx.font = "bold 14px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(color, i * colorWidth + colorWidth / 2, height - 16);
+  });
+
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${name.replace(/\s+/g, "-").toLowerCase()}.png`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+  toast.success("Exported as PNG!", { duration: 1500 });
+}
+
+function exportAsSVG(colors: string[], name: string) {
+  const w = 120;
+  const h = 200;
+  const totalW = colors.length * w;
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${h}" viewBox="0 0 ${totalW} ${h}">`;
+  colors.forEach((color, i) => {
+    svg += `<rect x="${i * w}" y="0" width="${w}" height="${h}" fill="${color}" />`;
+    svg += `<text x="${i * w + w / 2}" y="${h - 16}" fill="${getContrastColor(color)}" font-family="monospace" font-size="14" font-weight="bold" text-anchor="middle">${color}</text>`;
+  });
+  svg += "</svg>";
+  downloadFile(svg, `${name.replace(/\s+/g, "-").toLowerCase()}.svg`, "image/svg+xml");
+  toast.success("Exported as SVG!", { duration: 1500 });
+}
+
 export function PaletteDetailModal({ palette, onClose }: PaletteDetailModalProps) {
   const copyColor = (color: string) => {
     navigator.clipboard.writeText(color);
     toast.success(`Copied ${color}`, { duration: 1500 });
+  };
+
+  const copyAllColors = () => {
+    navigator.clipboard.writeText(palette.colors.join(", "));
+    toast.success("Copied all colors!", { duration: 1500 });
+  };
+
+  const copyAsFormat = (format: string) => {
+    let output = "";
+    switch (format) {
+      case "css": output = generateCSS(palette.colors); break;
+      case "scss": output = generateSCSS(palette.colors); break;
+      case "tailwind": output = generateTailwind(palette.colors); break;
+      case "array": output = generateArray(palette.colors); break;
+      default: output = palette.colors.join(", ");
+    }
+    navigator.clipboard.writeText(output);
+    toast.success(`Copied as ${format.toUpperCase()}!`, { duration: 1500 });
   };
 
   return (
@@ -34,14 +134,69 @@ export function PaletteDetailModal({ palette, onClose }: PaletteDetailModalProps
         className="w-full max-w-3xl bg-card rounded-2xl shadow-2xl overflow-hidden border border-border"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Header with actions */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="text-xl font-semibold">{palette.name}</h2>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Export as image dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground">
+                  <Download className="w-4 h-4" />
+                  <span>Export</span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border-border">
+                <DropdownMenuItem onClick={() => exportAsPNG(palette.colors, palette.name)} className="cursor-pointer">
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  <span className="font-medium">PNG</span>
+                  <span className="text-xs text-muted-foreground ml-2">Image File</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportAsSVG(palette.colors, palette.name)} className="cursor-pointer">
+                  <FileCode className="w-4 h-4 mr-2" />
+                  <span className="font-medium">SVG</span>
+                  <span className="text-xs text-muted-foreground ml-2">Vector File</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Copy as code dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-1 px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground">
+                  <Code className="w-4 h-4" />
+                  <span>Copy as...</span>
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-card border-border">
+                <DropdownMenuItem onClick={() => copyAsFormat("css")} className="cursor-pointer">
+                  <span className="font-medium">CSS</span>
+                  <span className="text-xs text-muted-foreground ml-2">CSS Variables</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => copyAsFormat("scss")} className="cursor-pointer">
+                  <span className="font-medium">SCSS</span>
+                  <span className="text-xs text-muted-foreground ml-2">SASS Variables</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => copyAsFormat("tailwind")} className="cursor-pointer">
+                  <span className="font-medium">Tailwind</span>
+                  <span className="text-xs text-muted-foreground ml-2">Config Extension</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => copyAsFormat("array")} className="cursor-pointer">
+                  <span className="font-medium">Array</span>
+                  <span className="text-xs text-muted-foreground ml-2">JavaScript Array</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <button onClick={copyAllColors} className="p-2 rounded-lg hover:bg-secondary transition-colors" title="Copy all colors">
+              <Copy className="w-5 h-5 text-muted-foreground" />
+            </button>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-muted transition-colors">
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         <div className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">

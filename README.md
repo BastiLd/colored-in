@@ -2,6 +2,25 @@
 
 A beautiful color palette generator and browser for creative professionals.
 
+## Chrome Extension installieren (wichtig)
+
+Wenn du die Extension in Chrome laden willst, nutze **genau diesen Ordner**:
+`Chrome Extension Colored-In`
+
+### Schritt-für-Schritt
+
+1. Auf GitHub auf `Code` klicken und `Download ZIP` wählen.
+2. ZIP entpacken.
+3. In Chrome `chrome://extensions` öffnen.
+4. Oben rechts `Developer mode` aktivieren.
+5. `Load unpacked` klicken.
+6. Den entpackten Ordner `Chrome Extension Colored-In` auswählen (nicht den gesamten Repo-Root).
+7. Danach erscheint die Extension in Chrome und kann verwendet werden.
+
+### Nach Updates
+
+Wenn du neue Änderungen aus GitHub ziehst, in `chrome://extensions` bei der Extension auf `Reload` klicken.
+
 ## Local development
 
 ```sh

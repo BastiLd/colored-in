@@ -3,9 +3,46 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Colored In</title>
-    <meta name="description" content="Beautiful color palettes for your creative projects" />
+    <title>Colored In - AI Color Palette Generator | 50,000+ Palettes</title>
+    <meta name="description" content="Create stunning color palettes with AI, explore 50,000+ curated schemes, and analyze images & websites for perfect colors. Free to use." />
     <meta name="author" content="Basti" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0f1117" />
+    <link rel="canonical" href="https://bastild.github.io/colored-in/" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Colored In - AI Color Palette Generator" />
+    <meta property="og:description" content="Create stunning color palettes with AI, explore 50,000+ curated schemes, and analyze images & websites for perfect colors." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://bastild.github.io/colored-in/" />
+    <meta property="og:image" content="https://bastild.github.io/colored-in/og-image.png" />
+    <meta property="og:site_name" content="Colored In" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Colored In - AI Color Palette Generator" />
+    <meta name="twitter:description" content="Create stunning color palettes with AI, explore 50,000+ curated schemes, and analyze images & websites." />
+    <meta name="twitter:image" content="https://bastild.github.io/colored-in/og-image.png" />
+
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Colored In",
+      "url": "https://bastild.github.io/colored-in/",
+      "description": "AI-powered color palette generator with 50,000+ curated schemes",
+      "applicationCategory": "DesignApplication",
+      "operatingSystem": "Any",
+      "offers": [
+        { "@type": "Offer", "price": "0", "priceCurrency": "EUR", "name": "Free" },
+        { "@type": "Offer", "price": "2.99", "priceCurrency": "EUR", "name": "Pro" },
+        { "@type": "Offer", "price": "5.99", "priceCurrency": "EUR", "name": "Ultra" },
+        { "@type": "Offer", "price": "15.99", "priceCurrency": "EUR", "name": "Individual" }
+      ]
+    }
+    </script>
 
     <!-- GitHub Pages SPA fallback (pairs with /public/404.html) -->
     <script>
@@ -30,13 +67,12 @@
       })();
     </script>
 
-    <meta property="og:title" content="Colored In" />
-    <meta property="og:description" content="Beautiful color palettes for your creative projects" />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="favicon.ico" />
     <link rel="icon" href="favicon.ico" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
   </head>
   <body>
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:outline-none">Skip to content</a>
     <div id="root"></div>
     <script type="module" src="src/main.tsx"></script>
   </body>

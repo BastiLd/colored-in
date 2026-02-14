@@ -13,6 +13,7 @@ const state = {
   selectedAssetId: null,
   generatedPalettes: [],
   assets: [],
+  notes: [],
   previousView: null,
 };
 
@@ -113,10 +114,57 @@ const elements = {
   detailPaletteName: document.getElementById('detail-palette-name'),
   detailContent: document.getElementById('detail-content'),
 
+  // Notes View
+  menuNotes: document.getElementById('menu-notes'),
+  notesBackBtn: document.getElementById('notes-back-btn'),
+  notesDownloadBtn: document.getElementById('notes-download-btn'),
+  notesAddBtn: document.getElementById('notes-add-btn'),
+  notesList: document.getElementById('notes-list'),
+  noteEditorModal: document.getElementById('note-editor-modal'),
+  noteEditorTitle: document.getElementById('note-editor-title'),
+  closeNoteEditor: document.getElementById('close-note-editor'),
+  noteTitleInput: document.getElementById('note-title-input'),
+  noteContentInput: document.getElementById('note-content-input'),
+  saveNoteBtn: document.getElementById('save-note-btn'),
+
+  // Site Mode View
+  menuSiteMode: document.getElementById('menu-site-mode'),
+  siteModeBackBtn: document.getElementById('site-mode-back-btn'),
+  siteTopic: document.getElementById('site-topic'),
+  siteAudience: document.getElementById('site-audience'),
+  siteStyle: document.getElementById('site-style'),
+  siteAdditional: document.getElementById('site-additional'),
+  siteGenerateBtn: document.getElementById('site-generate-btn'),
+  siteError: document.getElementById('site-error'),
+  siteResults: document.getElementById('site-results'),
+
+  // Contact View
+  menuContact: document.getElementById('menu-contact'),
+  contactBackBtn: document.getElementById('contact-back-btn'),
+  contactCategory: document.getElementById('contact-category'),
+  contactSubject: document.getElementById('contact-subject'),
+  contactMessage: document.getElementById('contact-message'),
+  contactSendBtn: document.getElementById('contact-send-btn'),
+
   // Toast
   toast: document.getElementById('toast'),
   toastMessage: document.getElementById('toast-message'),
 };
+
+// ============================================
+// Plan Helpers
+// ============================================
+function getUserPlanLevel() {
+  const rawPlan = state.subscription?.plan;
+  const plan = window.SupabaseClient?.normalizePlan?.(rawPlan) || (typeof rawPlan === 'string' ? rawPlan.toLowerCase() : 'free');
+  return plan;
+}
+
+function isIndividualUser() {
+  const plan = getUserPlanLevel();
+  const isActive = Boolean(state.subscription?.is_active);
+  return isActive && plan === 'individual';
+}
 
 // ============================================
 // Utility Functions
@@ -133,14 +181,8 @@ function showToast(message, type = 'info') {
 
 function showView(viewName) {
   // Hide all views
-  elements.loginView.classList.add('hidden');
-  elements.blurView.classList.add('hidden');
-  elements.mainView.classList.add('hidden');
-  elements.aiView.classList.add('hidden');
-  elements.analyzeView.classList.add('hidden');
-  elements.assetsView.classList.add('hidden');
-  elements.palettesView.classList.add('hidden');
-  elements.detailView.classList.add('hidden');
+  const allViews = document.querySelectorAll('.view');
+  allViews.forEach(v => v.classList.add('hidden'));
 
   // Show requested view
   const viewElement = document.getElementById(`${viewName}-view`);
@@ -187,6 +229,7 @@ async function checkAuth() {
       
       if (isPremiumUser()) {
         updateUserInfo();
+        updateMenuGating();
         showView('main');
       } else {
         showView('blur');
@@ -211,6 +254,7 @@ async function login(email, password) {
     
     if (isPremiumUser()) {
       updateUserInfo();
+      updateMenuGating();
       showView('main');
     } else {
       showView('blur');
@@ -477,43 +521,65 @@ async function loadAssets(targetList) {
 
 async function hydrateAssetsForDisplay(assets) {
   const bucket = 'user-assets';
-  const hydrated = assets.map((asset) => {
+  const hydrated = await Promise.all(assets.map(async (asset) => {
     if (asset.type !== 'image') return asset;
-    
-    console.log('Processing asset:', asset.id, 'URL:', asset.url);
-    
-    // If it's a data URL or blob URL, use it directly
-    if (asset.url?.startsWith('data:') || asset.url?.startsWith('blob:')) {
-      console.log('Asset is data/blob URL');
+
+    try {
+      // Keep local/temporary images untouched.
+      if (asset.url?.startsWith('data:') || asset.url?.startsWith('blob:')) {
+        return { ...asset, displayUrl: asset.url };
+      }
+
+      let path = SupabaseClient.getStoragePathFromUrl(asset.url);
+      if (path) {
+        path = path.replace(/^\/+/, '');
+        if (path.startsWith(`${bucket}/`)) {
+          path = path.slice(bucket.length + 1);
+        }
+      }
+      if (!path) {
+        return { ...asset, displayUrl: asset.url };
+      }
+
+      // Prefer a fresh signed URL for private bucket assets.
+      const signedUrl = await SupabaseClient.createSignedUrl(bucket, path, 60 * 60);
+      if (signedUrl) {
+        return { ...asset, displayUrl: signedUrl };
+      }
+
+      const publicUrl = SupabaseClient.getPublicUrl(bucket, path);
+      if (publicUrl) {
+        return { ...asset, displayUrl: publicUrl };
+      }
+
+      // Last resort for private buckets: fetch with auth and render from blob URL.
+      await SupabaseClient.ensureConfig();
+      const hasAuth = await SupabaseClient.ensureAuth();
+      if (hasAuth && SupabaseClient.accessToken) {
+        const safePath = SupabaseClient.encodeStoragePath(path);
+        const response = await fetch(
+          `${SupabaseClient.url}/storage/v1/object/authenticated/${bucket}/${safePath}`,
+          {
+            headers: {
+              apikey: SupabaseClient.key,
+              Authorization: `Bearer ${SupabaseClient.accessToken}`,
+            },
+          }
+        );
+        if (response.ok) {
+          const blob = await response.blob();
+          if (blob && blob.size > 0) {
+            return { ...asset, displayUrl: URL.createObjectURL(blob) };
+          }
+        }
+      }
+
+      return { ...asset, displayUrl: asset.url };
+    } catch (error) {
+      console.error('Failed to hydrate image asset:', asset.id, error);
       return { ...asset, displayUrl: asset.url };
     }
-    
-    // If the URL is already a public URL, use it directly
-    if (asset.url?.includes('/storage/v1/object/public/')) {
-      console.log('Asset already has public URL, using directly');
-      return { ...asset, displayUrl: asset.url };
-    }
-    
-    // Try to get storage path from URL
-    let path = SupabaseClient.getStoragePathFromUrl(asset.url);
-    console.log('Extracted path:', path);
-    
-    // If path extraction failed, try using the URL directly as path if it looks like a path
-    if (!path && asset.url && !asset.url.startsWith('http') && asset.url.includes('/')) {
-      path = asset.url;
-      console.log('Using URL directly as path:', path);
-    }
-    
-    if (!path) {
-      console.warn('Could not extract path from URL:', asset.url);
-      return { ...asset, displayUrl: asset.url };
-    }
-    
-    // Use public URL (bucket is public, no need for signed URLs)
-    const publicUrl = SupabaseClient.getPublicUrl(bucket, path);
-    console.log('Using public URL:', publicUrl);
-    return { ...asset, displayUrl: publicUrl || asset.url };
-  });
+  }));
   
   console.log('Hydrated assets:', hydrated);
   return hydrated;
@@ -936,6 +1002,298 @@ function showPaletteDetail(palette) {
 }
 
 // ============================================
+// Notes System (Individual Plan)
+// ============================================
+let editingNoteId = null;
+let selectedNoteColor = '#a78bfa';
+
+async function loadNotes() {
+  if (!state.user) return;
+  elements.notesList.innerHTML = '<p class="loading-text">Loading notes...</p>';
+
+  try {
+    // Load from cloud first, then merge with local
+    let cloudNotes = [];
+    try {
+      await SupabaseClient.ensureConfig();
+      cloudNotes = await SupabaseClient.getUserNotes(state.user.id);
+    } catch (e) {
+      console.log('Cloud notes unavailable, using local only');
+    }
+
+    // Load local notes
+    const localResult = await chrome.storage.local.get('notes');
+    const localNotes = localResult.notes || [];
+
+    // Merge: cloud takes priority, local fills gaps
+    const mergedMap = new Map();
+    localNotes.forEach(n => mergedMap.set(n.id, n));
+    cloudNotes.forEach(n => mergedMap.set(n.id, n));
+    
+    const notes = Array.from(mergedMap.values()).sort((a, b) => 
+      new Date(b.updated_at || b.created_at) - new Date(a.updated_at || a.created_at)
+    );
+
+    state.notes = notes;
+    renderNotes(notes);
+  } catch (error) {
+    console.error('Failed to load notes:', error);
+    elements.notesList.innerHTML = '<p class="loading-text">Failed to load notes</p>';
+  }
+}
+
+function renderNotes(notes) {
+  if (!notes || notes.length === 0) {
+    elements.notesList.innerHTML = `
+      <div class="notes-empty">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+        </svg>
+        <p>No notes yet. Click + to create one!</p>
+      </div>`;
+    return;
+  }
+
+  elements.notesList.innerHTML = '';
+  notes.forEach(note => {
+    const card = document.createElement('div');
+    card.className = 'sticky-note';
+    card.style.backgroundColor = note.color || '#a78bfa';
+    card.addEventListener('click', () => openNoteEditor(note));
+
+    const title = document.createElement('div');
+    title.className = 'sticky-note-title';
+    title.textContent = note.title || 'Untitled';
+
+    const content = document.createElement('div');
+    content.className = 'sticky-note-content';
+    content.textContent = note.content || '';
+
+    const date = document.createElement('div');
+    date.className = 'sticky-note-date';
+    date.textContent = new Date(note.updated_at || note.created_at).toLocaleDateString();
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'sticky-note-delete';
+    deleteBtn.innerHTML = '&times;';
+    deleteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteNote(note.id);
+    });
+
+    card.appendChild(deleteBtn);
+    card.appendChild(title);
+    card.appendChild(content);
+    card.appendChild(date);
+    elements.notesList.appendChild(card);
+  });
+}
+
+function openNoteEditor(note = null) {
+  editingNoteId = note?.id || null;
+  elements.noteEditorTitle.textContent = note ? 'Edit Note' : 'New Note';
+  elements.noteTitleInput.value = note?.title || '';
+  elements.noteContentInput.value = note?.content || '';
+  selectedNoteColor = note?.color || '#a78bfa';
+
+  // Update color picker
+  document.querySelectorAll('.note-color-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.color === selectedNoteColor);
+  });
+
+  elements.noteEditorModal.classList.remove('hidden');
+}
+
+function closeNoteEditor() {
+  elements.noteEditorModal.classList.add('hidden');
+  editingNoteId = null;
+}
+
+async function saveNote() {
+  const title = elements.noteTitleInput.value.trim();
+  const content = elements.noteContentInput.value.trim();
+  
+  if (!title && !content) {
+    showToast('Please enter a title or content', 'error');
+    return;
+  }
+
+  const noteData = {
+    title: title || 'Untitled',
+    content,
+    color: selectedNoteColor,
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    if (editingNoteId) {
+      // Update existing note
+      try {
+        await SupabaseClient.updateNote(editingNoteId, noteData);
+      } catch (e) { console.log('Cloud update failed, saving locally'); }
+      
+      // Update local storage
+      const localResult = await chrome.storage.local.get('notes');
+      const notes = localResult.notes || [];
+      const idx = notes.findIndex(n => n.id === editingNoteId);
+      if (idx >= 0) {
+        notes[idx] = { ...notes[idx], ...noteData };
+      }
+      await chrome.storage.local.set({ notes });
+    } else {
+      // Create new note
+      const localId = 'note-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      let finalNote = { id: localId, user_id: state.user?.id, ...noteData, created_at: new Date().toISOString() };
+      
+      try {
+        const cloudNote = await SupabaseClient.createNote({ user_id: state.user.id, ...noteData });
+        if (cloudNote) finalNote = cloudNote;
+      } catch (e) { console.log('Cloud create failed, saving locally'); }
+
+      // Save to local storage
+      const localResult = await chrome.storage.local.get('notes');
+      const notes = localResult.notes || [];
+      notes.unshift(finalNote);
+      await chrome.storage.local.set({ notes });
+    }
+
+    closeNoteEditor();
+    showToast('Note saved!', 'success');
+    await loadNotes();
+  } catch (error) {
+    showToast('Failed to save note', 'error');
+  }
+}
+
+async function deleteNote(noteId) {
+  try {
+    try { await SupabaseClient.deleteNote(noteId); } catch (e) { /* local only */ }
+    
+    const localResult = await chrome.storage.local.get('notes');
+    const notes = (localResult.notes || []).filter(n => n.id !== noteId);
+    await chrome.storage.local.set({ notes });
+    
+    showToast('Note deleted');
+    await loadNotes();
+  } catch (error) {
+    showToast('Failed to delete note', 'error');
+  }
+}
+
+function downloadNotesAsTxt() {
+  const notes = state.notes || [];
+  if (notes.length === 0) {
+    showToast('No notes to download', 'error');
+    return;
+  }
+
+  let txt = 'Colored In - Notes Export\n';
+  txt += '========================\n\n';
+  
+  notes.forEach((note, i) => {
+    txt += `--- Note ${i + 1} ---\n`;
+    txt += `Title: ${note.title || 'Untitled'}\n`;
+    txt += `Date: ${new Date(note.updated_at || note.created_at).toLocaleString()}\n\n`;
+    txt += `${note.content || '(empty)'}\n\n`;
+  });
+
+  const blob = new Blob([txt], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `colored-in-notes-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Notes downloaded!', 'success');
+}
+
+// ============================================
+// Site Mode (Individual Plan)
+// ============================================
+async function generateSiteTheme() {
+  const topic = elements.siteTopic.value.trim();
+  const audience = elements.siteAudience.value.trim();
+  const style = elements.siteStyle.value.trim();
+  const additional = elements.siteAdditional.value.trim();
+
+  if (!topic) {
+    showToast('Please enter a topic/industry', 'error');
+    return;
+  }
+
+  setLoading(elements.siteGenerateBtn, true);
+  elements.siteError.classList.add('hidden');
+
+  try {
+    const result = await SupabaseClient.generateSiteTheme({
+      topic, audience, style, additional,
+    });
+
+    const palettes = [result];
+    if (state.paletteCount === 2) {
+      const result2 = await SupabaseClient.generateSiteTheme({
+        topic, audience, style: style + ' (alternative variation)', additional,
+      });
+      palettes.push(result2);
+    }
+
+    renderPalettes(palettes, elements.siteResults);
+    state.generatedPalettes = palettes;
+    showToast('Theme generated!', 'success');
+  } catch (error) {
+    console.error('Site theme generation failed:', error);
+    elements.siteError.textContent = error.message || 'Failed to generate theme';
+    elements.siteError.classList.remove('hidden');
+  } finally {
+    setLoading(elements.siteGenerateBtn, false);
+  }
+}
+
+// ============================================
+// Contact Form (Individual Plan)
+// ============================================
+function sendContactMessage() {
+  const category = elements.contactCategory.value;
+  const subject = elements.contactSubject.value.trim();
+  const message = elements.contactMessage.value.trim();
+
+  if (!subject || !message) {
+    showToast('Please fill in subject and message', 'error');
+    return;
+  }
+
+  const userEmail = state.user?.email || 'unknown';
+  const plan = getUserPlanLevel();
+  const body = `Category: ${category}\nFrom: ${userEmail} (${plan} plan)\n\n${message}`;
+  const mailtoUrl = `mailto:bastian.klaus2010@gmail.com?subject=${encodeURIComponent(`[Colored In ${category}] ${subject}`)}&body=${encodeURIComponent(body)}`;
+
+  chrome.tabs.create({ url: mailtoUrl });
+  
+  // Clear form
+  elements.contactSubject.value = '';
+  elements.contactMessage.value = '';
+  showToast('Opening email client...', 'success');
+}
+
+// ============================================
+// Feature Gating
+// ============================================
+function updateMenuGating() {
+  const individual = isIndividualUser();
+  
+  // Individual-only menu items
+  const individualItems = document.querySelectorAll('.menu-item.individual-only');
+  individualItems.forEach(item => {
+    if (individual) {
+      item.classList.add('enabled');
+    } else {
+      item.classList.remove('enabled');
+    }
+  });
+}
+
+// ============================================
 // Event Listeners
 // ============================================
 function initEventListeners() {
@@ -963,7 +1321,7 @@ function initEventListeners() {
   elements.menuOverlay.addEventListener('click', closeMenu);
   elements.menuAI.addEventListener('click', () => showView('ai'));
   elements.menuManual.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://bastild.github.io/colored-in/pro-builder' });
+    chrome.tabs.create({ url: 'https://bastild.github.io/colored-in/dashboard?view=generator' });
   });
   elements.menuAnalyze.addEventListener('click', () => {
     showView('analyze');
@@ -993,7 +1351,7 @@ function initEventListeners() {
   // Main View Quick Actions
   elements.quickAI.addEventListener('click', () => showView('ai'));
   elements.quickManual.addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://bastild.github.io/colored-in/pro-builder' });
+    chrome.tabs.create({ url: 'https://bastild.github.io/colored-in/dashboard?view=generator' });
   });
   elements.quickAnalyze.addEventListener('click', () => {
     showView('analyze');
@@ -1068,6 +1426,57 @@ function initEventListeners() {
       closeAnalyzeModalFn();
     }
   });
+
+  // Notes
+  elements.menuNotes.addEventListener('click', () => {
+    if (!isIndividualUser()) {
+      showToast('Notes requires an Individual plan', 'error');
+      return;
+    }
+    showView('notes');
+    loadNotes();
+  });
+  elements.notesBackBtn.addEventListener('click', () => showView('main'));
+  elements.notesAddBtn.addEventListener('click', () => openNoteEditor());
+  elements.notesDownloadBtn.addEventListener('click', downloadNotesAsTxt);
+  elements.closeNoteEditor.addEventListener('click', closeNoteEditor);
+  elements.saveNoteBtn.addEventListener('click', saveNote);
+
+  // Note color picker
+  document.querySelectorAll('.note-color-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.note-color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedNoteColor = btn.dataset.color;
+    });
+  });
+
+  // Note editor modal backdrop click
+  elements.noteEditorModal.addEventListener('click', (e) => {
+    if (e.target === elements.noteEditorModal) closeNoteEditor();
+  });
+
+  // Site Mode
+  elements.menuSiteMode.addEventListener('click', () => {
+    if (!isIndividualUser()) {
+      showToast('Site Mode requires an Individual plan', 'error');
+      return;
+    }
+    showView('site-mode');
+  });
+  elements.siteModeBackBtn.addEventListener('click', () => showView('main'));
+  elements.siteGenerateBtn.addEventListener('click', generateSiteTheme);
+
+  // Contact
+  elements.menuContact.addEventListener('click', () => {
+    if (!isIndividualUser()) {
+      showToast('Contact requires an Individual plan', 'error');
+      return;
+    }
+    showView('contact');
+  });
+  elements.contactBackBtn.addEventListener('click', () => showView('main'));
+  elements.contactSendBtn.addEventListener('click', sendContactMessage);
 }
 
 // ============================================

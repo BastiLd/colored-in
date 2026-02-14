@@ -6,6 +6,8 @@ import { AIPaletteGenerator } from "./AIPaletteGenerator";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { LogOut, User as UserIcon, Sparkles, Palette as PaletteIcon, Image as ImageIcon } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { GuidedTour } from "./GuidedTour";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -294,6 +296,21 @@ function getContrastColor(hex: string): string {
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance > 0.5 ? "#000000" : "#FFFFFF";
 }
+// Skeleton for palette grid while loading
+function PaletteGridSkeleton() {
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {Array.from({ length: 9 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 rounded-lg" />
+      ))}
+    </div>
+  );
+}
+
+function FeaturedPaletteSkeleton() {
+  return <Skeleton className="h-48 md:h-64 rounded-2xl" />;
+}
+
 export function HomePage({
   onStartGenerator,
   onBrowsePalettes
@@ -304,7 +321,9 @@ export function HomePage({
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [userPlan, setUserPlan] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const featuredPalette = palettes[featuredIndex];
+  const palettesReady = palettes.length > 0;
 
   // Auth state
   useEffect(() => {
@@ -312,7 +331,6 @@ export function HomePage({
       (event, session) => {
         setUser(session?.user ?? null);
         if (session?.user) {
-          // Fetch user plan
           supabase
             .from('user_subscriptions')
             .select('plan, is_active')
@@ -324,9 +342,11 @@ export function HomePage({
               } else {
                 setUserPlan('free');
               }
+              setAuthLoading(false);
             });
         } else {
           setUserPlan(null);
+          setAuthLoading(false);
         }
       }
     );
@@ -334,7 +354,6 @@ export function HomePage({
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        // Fetch user plan
         supabase
           .from('user_subscriptions')
           .select('plan, is_active')
@@ -346,7 +365,10 @@ export function HomePage({
             } else {
               setUserPlan('free');
             }
+            setAuthLoading(false);
           });
+      } else {
+        setAuthLoading(false);
       }
     });
 
@@ -387,13 +409,15 @@ export function HomePage({
 
   return <div className="min-h-screen bg-background relative">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-border" role="banner">
         <h1 className="text-xl font-bold text-gradient font-display">Colored In</h1>
-        <nav className="flex items-center gap-4">
-          <button onClick={() => navigate("/pricing")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <nav className="flex items-center gap-4" aria-label="Main navigation">
+          <button id="home-pricing-btn" onClick={() => navigate("/pricing")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Go Pro
           </button>
-          {!user ? (
+          {authLoading ? (
+            <Skeleton className="w-24 h-9 rounded-lg" />
+          ) : !user ? (
             <>
               <button onClick={() => navigate("/auth")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Sign in
@@ -434,7 +458,7 @@ export function HomePage({
       )}
 
       {/* Hero Section */}
-      <main className="container mx-auto px-6 py-12 md:py-20">
+      <main id="main-content" className="container mx-auto px-6 py-12 md:py-20">
         <div className="grid lg:grid-cols-2 gap-12 items-center mb-20">
           {/* Left - Text */}
           <div className="space-y-8">
@@ -446,13 +470,13 @@ export function HomePage({
             </div>
 
             <div className="flex flex-wrap gap-4">
-              <button onClick={() => setShowAIGenerator(true)} className="px-6 py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all shadow-lg hover:scale-105">
+              <button id="home-ai-btn" onClick={() => setShowAIGenerator(true)} className="px-6 py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all shadow-lg hover:scale-105">
                 Generate with AI
               </button>
-              <button onClick={handleManualGenerator} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors hover:scale-105">
+              <button id="home-manual-btn" onClick={handleManualGenerator} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors hover:scale-105">
                 Manual Generator
               </button>
-              <button onClick={onBrowsePalettes} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors hover:scale-105">
+              <button id="home-explore-btn" onClick={onBrowsePalettes} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors hover:scale-105">
                 Explore 50.000+ Palettes
               </button>
             </div>
@@ -463,12 +487,20 @@ export function HomePage({
           {/* Right - Palette Display */}
           <div className="space-y-6">
             {/* Mini palette grid */}
-            <div className="grid grid-cols-3 gap-3">
-              {palettes.slice(0, 9).map((palette, i) => <MiniPaletteCard key={palette.id} palette={palette} onClick={() => setFeaturedIndex(i)} />)}
-            </div>
+            {palettesReady ? (
+              <div className="grid grid-cols-3 gap-3">
+                {palettes.slice(0, 9).map((palette, i) => <MiniPaletteCard key={palette.id} palette={palette} onClick={() => setFeaturedIndex(i)} />)}
+              </div>
+            ) : (
+              <PaletteGridSkeleton />
+            )}
 
             {/* Featured palette */}
-            <FeaturedPalette palette={featuredPalette} />
+            {palettesReady && featuredPalette ? (
+              <FeaturedPalette palette={featuredPalette} />
+            ) : (
+              <FeaturedPaletteSkeleton />
+            )}
           </div>
         </div>
 
@@ -608,6 +640,48 @@ export function HomePage({
           </div>
         </div>
       </main>
+
+      {/* Welcome Tour for first-time visitors */}
+      <GuidedTour
+        storageKey="tour-homepage"
+        steps={[
+          {
+            id: "welcome",
+            title: "Welcome to Colored In!",
+            description: "Create beautiful color palettes with AI or manually. Let us show you around!",
+            selector: ".text-gradient",
+            placement: "bottom",
+          },
+          {
+            id: "ai-generate",
+            title: "AI Palette Generator",
+            description: "Click here to describe your vision and let AI create stunning palettes instantly.",
+            selector: "#home-ai-btn",
+            placement: "bottom",
+          },
+          {
+            id: "manual-gen",
+            title: "Manual Generator",
+            description: "Prefer full control? Use the manual generator to pick and customize every color.",
+            selector: "#home-manual-btn",
+            placement: "bottom",
+          },
+          {
+            id: "browse",
+            title: "Explore Palettes",
+            description: "Browse over 50,000 curated color palettes for inspiration. Click any palette to see details!",
+            selector: "#home-explore-btn",
+            placement: "bottom",
+          },
+          {
+            id: "pricing",
+            title: "Upgrade for More",
+            description: "Check out Pro, Ultra, and Individual plans for unlimited AI generations, Chrome Extension, and more!",
+            selector: "#home-pricing-btn",
+            placement: "bottom",
+          },
+        ]}
+      />
 
       {/* AI Palette Generator Modal */}
       <AIPaletteGenerator isOpen={showAIGenerator} onClose={() => setShowAIGenerator(false)} />

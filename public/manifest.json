@@ -1,0 +1,26 @@
+{
+  "name": "Colored In - AI Color Palette Generator",
+  "short_name": "Colored In",
+  "description": "Create stunning color palettes with AI, explore 50,000+ curated schemes",
+  "start_url": "/colored-in/",
+  "display": "standalone",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["design", "productivity"],
+  "lang": "en"
+}

@@ -72,3 +72,12 @@ if (!rootEl) {
     </ErrorBoundary>
   );
 }
+
+// Register Service Worker for PWA support
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/colored-in/sw.js").catch(() => {
+      // SW registration failed - app still works without it
+    });
+  });
+}

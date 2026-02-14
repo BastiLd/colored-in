@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Copy, Code, ChevronDown } from "lucide-react";
+import { X, Copy, Code, ChevronDown, Heart, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { type Palette } from "@/data/palettes";
 import {
@@ -171,6 +171,17 @@ export function PaletteModal({ palette, onClose }: PaletteModalProps) {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <button
+              onClick={() => {
+                const shareUrl = `${window.location.origin}${import.meta.env.BASE_URL}explore?palette=${palette.id}`;
+                navigator.clipboard.writeText(shareUrl);
+                toast.success("Share link copied!", { duration: 1500, position: "bottom-center" });
+              }}
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              title="Share palette"
+            >
+              <Share2 className="w-5 h-5 text-muted-foreground" />
+            </button>
             <button
               onClick={copyAllColors}
               className="p-2 rounded-lg hover:bg-secondary transition-colors"

@@ -1086,6 +1086,261 @@ body {
   border-color: var(--error-color);
 }
 
+/* Menu Divider & Label */
+.menu-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 8px 12px;
+}
+
+.menu-label {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 12px 8px;
+}
+
+.menu-item.individual-only {
+  opacity: 0.5;
+  position: relative;
+}
+
+.menu-item.individual-only.enabled {
+  opacity: 1;
+}
+
+/* View Header Actions */
+.view-header-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+}
+
+.header-btn-small {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.header-btn-small:hover {
+  border-color: var(--accent-purple);
+}
+
+/* Notes Grid */
+.notes-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.sticky-note {
+  padding: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.sticky-note:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.sticky-note-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #000;
+}
+
+.sticky-note-content {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.7);
+  line-height: 1.4;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.sticky-note-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2);
+  border: none;
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.sticky-note:hover .sticky-note-delete {
+  display: flex;
+}
+
+.sticky-note-date {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.4);
+  margin-top: 8px;
+}
+
+/* Note Editor */
+.note-editor {
+  max-width: 360px;
+}
+
+.note-input {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.note-input:focus {
+  border-color: var(--accent-purple);
+}
+
+.note-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.note-textarea:focus {
+  border-color: var(--accent-purple);
+}
+
+.note-color-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.note-color-picker label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.note-colors {
+  display: flex;
+  gap: 6px;
+}
+
+.note-color-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.note-color-btn:hover {
+  transform: scale(1.2);
+}
+
+.note-color-btn.active {
+  border-color: white;
+  box-shadow: 0 0 0 2px var(--accent-purple);
+}
+
+.notes-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-muted);
+}
+
+.notes-empty svg {
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.notes-empty p {
+  font-size: 13px;
+}
+
+/* Site Mode */
+.site-mode-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.site-mode-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.site-results {
+  margin-top: 12px;
+}
+
+/* Contact View */
+.contact-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contact-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.contact-email-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 8px;
+}
+
+select.note-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23a0a0b0' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+
 /* Hidden class */
 .hidden {
   display: none !important;
