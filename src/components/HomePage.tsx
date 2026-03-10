@@ -390,19 +390,12 @@ export function HomePage({
 
   // Handle Manual Generator click with plan check
   const handleManualGenerator = () => {
-    if (!user) {
-      // Not logged in - redirect to auth
-      toast.info("Please sign in to access the Manual Generator");
-      navigate("/auth");
-      return;
-    }
-    
     const paidPlans = ['pro', 'ultra', 'individual'];
-    if (userPlan && paidPlans.includes(userPlan.toLowerCase())) {
+    if (user && userPlan && paidPlans.includes(userPlan.toLowerCase())) {
       // Has Pro+ plan - go directly to the dashboard's generator view (Pro Builder)
       navigate("/dashboard?view=generator");
     } else {
-      // Free plan - show upgrade prompt or use basic generator
+      // Guests and free users can use the basic manual generator without an account.
       onStartGenerator();
     }
   };
