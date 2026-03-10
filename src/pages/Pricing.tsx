@@ -36,7 +36,7 @@ const plans: Plan[] = [
     features: [
       { text: "View 500 palettes", included: true },
       { text: "1 AI palette generation", included: true },
-      { text: "Basic manual generator", included: true },
+      { text: "Basic manual generator (no account required)", included: true },
       { text: "Ask Mode chat", included: false },
       { text: "Pro Manual Builder", included: false },
       { text: "Chrome Extension", included: false },
@@ -55,7 +55,7 @@ const plans: Plan[] = [
       { text: "Everything in Free", included: true },
       { text: "50 AI palette generations/month", included: true },
       { text: "30 Ask Mode chat messages/month", included: true },
-      { text: "Pro Manual Builder", included: true },
+      { text: "Pro Manual Builder + assets", included: true },
       { text: "View 1,000+ palettes", included: true },
       { text: "Save & organize palettes", included: true },
     ],
@@ -428,6 +428,9 @@ export default function Pricing() {
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
           From free palettes to professional tools - find the perfect plan for
           your creative needs.
+        </p>
+        <p className="text-sm text-muted-foreground mt-3">
+          The basic Manual Generator is free to use. You only need an account for Pro features like assets, Ask Mode, and saving palettes.
         </p>
       </div>
 

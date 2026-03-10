@@ -474,7 +474,14 @@ export function HomePage({
               </button>
             </div>
 
-            <p className="text-sm text-muted-foreground italic">And much more</p>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">
+                Manual Generator works without an account.
+              </p>
+              <p className="text-sm text-muted-foreground italic">
+                Sign in only for Pro tools like assets, Ask Mode, and saved palettes.
+              </p>
+            </div>
           </div>
 
           {/* Right - Palette Display */}
@@ -526,7 +533,7 @@ export function HomePage({
               </div>
               <h3 className="text-xl font-semibold mb-2">Pro Manual Builder</h3>
               <p className="text-sm text-muted-foreground">
-                Full control over every color. Lock, regenerate, harmonize, and save your perfect palettes with advanced tools.
+                Need more than the free Manual Generator? Unlock assets, Ask Mode, saving, and advanced palette tools with Pro.
               </p>
             </div>
 
