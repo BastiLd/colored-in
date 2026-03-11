@@ -35,12 +35,13 @@ const plans: Plan[] = [
     buttonText: "Current Plan",
     planKey: "free",
     features: [
+      { text: "Manual Generator without account", included: true },
       { text: "View 500 palettes", included: true },
       { text: "1 AI palette generation", included: true },
-      { text: "Basic manual generator (no account required)", included: true },
-      { text: "Ask Mode chat", included: false },
-      { text: "Pro Manual Builder", included: false },
-      { text: "Chrome Extension", included: false },
+      { text: "Palette saving", included: false },
+      { text: "Ask Mode", included: false },
+      { text: "Pro Manual Builder with assets", included: false },
+      { text: "Chrome Extension access", included: false },
     ],
   },
   {
@@ -55,8 +56,8 @@ const plans: Plan[] = [
     features: [
       { text: "Everything in Free", included: true },
       { text: "50 AI palette generations/month", included: true },
-      { text: "30 Ask Mode chat messages/month", included: true },
-      { text: "Pro Manual Builder + assets", included: true },
+      { text: "30 Ask Mode messages/month", included: true },
+      { text: "Pro Manual Builder with assets", included: true },
       { text: "View 1,000+ palettes", included: true },
       { text: "Save & organize palettes", included: true },
     ],
@@ -405,11 +406,11 @@ export default function Pricing() {
           Choose your plan
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          From free palettes to professional tools - find the perfect plan for
-          your creative needs.
+          Start with the free Manual Generator, then upgrade when you need
+          Pro tools like assets, Ask Mode, saved palettes, and higher limits.
         </p>
         <p className="text-sm text-muted-foreground mt-3">
-          The basic Manual Generator is free to use. You only need an account for Pro features like assets, Ask Mode, and saving palettes.
+          Free gives you the normal Manual Generator. Pro unlocks the Pro Manual Builder, assets, Ask Mode, saving, and more usage.
         </p>
       </div>
 
