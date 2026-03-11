@@ -58,9 +58,6 @@ const Settings = () => {
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setUser(session?.user ?? null);
-        if (!session?.user) {
-          navigate("/auth");
-        }
       }
     );
 
@@ -68,7 +65,7 @@ const Settings = () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
       if (!session?.user) {
-        navigate("/auth");
+        setLoading(false);
         return;
       }
 

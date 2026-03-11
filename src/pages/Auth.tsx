@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase, supabaseConfig, supabaseConfigError } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Mail, Lock, Loader2, Sparkles } from "lucide-react";
+import { useAccessState } from "@/hooks/useAccessState";
 
 // List of known temporary/disposable email domains
 const TEMP_EMAIL_DOMAINS = [
@@ -87,48 +88,17 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const access = useAccessState();
+  const redirectTarget = searchParams.get("redirect") || "/dashboard";
   const showDebug =
     import.meta.env.DEV || new URLSearchParams(window.location.search).has("debug");
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        // Check if user has a paid plan
-        const { data: subscriptionData } = await supabase
-          .from("user_subscriptions")
-          .select("plan, is_active")
-          .eq("user_id", session.user.id)
-          .single();
-        
-        const hasPaidPlan = subscriptionData?.is_active && subscriptionData?.plan !== "free";
-        if (hasPaidPlan) {
-          navigate("/dashboard");
-        } else {
-          navigate("/");
-        }
-      }
-    });
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        // Check if user has a paid plan
-        const { data: subscriptionData } = await supabase
-          .from("user_subscriptions")
-          .select("plan, is_active")
-          .eq("user_id", session.user.id)
-          .single();
-        
-        const hasPaidPlan = subscriptionData?.is_active && subscriptionData?.plan !== "free";
-        if (hasPaidPlan) {
-          navigate("/dashboard");
-        } else {
-          navigate("/");
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
+    if (!access.isLoading && access.user) {
+      navigate(redirectTarget, { replace: true });
+    }
+  }, [access.isLoading, access.user, navigate, redirectTarget]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,28 +128,12 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error, data } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
         toast.success("Welcome back!");
-        
-        // Check if user has a paid plan
-        if (data.session?.user) {
-          const { data: subscriptionData } = await supabase
-            .from("user_subscriptions")
-            .select("plan, is_active")
-            .eq("user_id", data.session.user.id)
-            .single();
-          
-          const hasPaidPlan = subscriptionData?.is_active && subscriptionData?.plan !== "free";
-          if (hasPaidPlan) {
-            navigate("/dashboard");
-          } else {
-            navigate("/");
-          }
-        }
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -198,8 +152,7 @@ export default function Auth() {
           }
         } else if (data.session) {
           toast.success("Account created! You're signed in.");
-          // New users start on free plan, so go to homepage
-          navigate("/");
+          navigate(redirectTarget, { replace: true });
         } else {
           // Email confirmation flow: user exists but no session yet.
           toast.success("Account created! Please check your email to confirm your account.");
