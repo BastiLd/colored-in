@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { getStoragePathFromUrl, USER_ASSETS_BUCKET } from "@/lib/storage";
 import { User } from "@supabase/supabase-js";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Home, Compass, Palette, Copy, Trash2, Sparkles, Upload, Link as LinkIcon, ExternalLink, Loader2, Image } from "lucide-react";
 import { PaletteBrowser } from "@/components/PaletteBrowser";
 import { PaletteGenerator } from "@/components/PaletteGenerator";
@@ -48,18 +49,11 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const access = useAccessState();
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<DashboardView>("home");
-  const [generationCount, setGenerationCount] = useState(0);
-  const [lastGeneration, setLastGeneration] = useState<string | null>(null);
-  const [userPalettes, setUserPalettes] = useState<SavedPalette[]>([]);
-  const [loadingPalettes, setLoadingPalettes] = useState(false);
-  const [chatUsageCount, setChatUsageCount] = useState(0);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [userAssets, setUserAssets] = useState<UserAsset[]>([]);
-  const [loadingAssets, setLoadingAssets] = useState(false);
   const [selectedPalette, setSelectedPalette] = useState<SavedPalette | null>(null);
 
   useEffect(() => {
@@ -80,7 +74,9 @@ const Dashboard = () => {
       // Refresh user data to get updated subscription
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
-          fetchUserData(session.user.id);
+          void queryClient.invalidateQueries({
+            queryKey: ["dashboard-profile", session.user.id],
+          });
         }
       });
     }
@@ -98,29 +94,24 @@ const Dashboard = () => {
       setUser(session?.user ?? null);
       if (!session?.user) {
         navigate("/auth");
-      } else {
-        fetchUserData(session.user.id);
-        const viewToLoad = initialView || currentView;
-        if (viewToLoad === "my-palettes") {
-          fetchUserPalettes(session.user.id);
-        } else if (viewToLoad === "uploads") {
-          fetchUserAssets(session.user.id);
-        }
       }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate, location.search]);
+  }, [navigate, location.search, queryClient]);
 
-  const fetchUserData = async (userId: string) => {
-    try {
-      const [profileResult, subscriptionResult, genResult] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("email")
-          .eq("user_id", userId)
-          .single(),
+  const profileQuery = useQuery({
+    queryKey: ["dashboard-profile", user?.id],
+    enabled: Boolean(user?.id),
+    queryFn: async () => {
+      const userId = user?.id;
+      if (!userId) {
+        throw new Error("Missing user id");
+      }
+
+      const [profileResult, subscriptionResult, usageResult] = await Promise.all([
+        supabase.from("profiles").select("email").eq("user_id", userId).single(),
         supabase
           .from("user_subscriptions")
           .select("plan, is_active")
@@ -133,21 +124,18 @@ const Dashboard = () => {
           .single(),
       ]);
 
-      setProfile({
-        email: profileResult.data?.email ?? user?.email ?? null,
-        plan: subscriptionResult.data?.plan ?? "free",
-        is_active: subscriptionResult.data?.is_active ?? false,
-      });
-
-      if (genResult.data) {
-        setGenerationCount(genResult.data.palette_generations_count || 0);
-        setLastGeneration(genResult.data.last_generation_at);
-        setChatUsageCount(genResult.data.chat_messages_count || 0);
-      }
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-    }
-  };
+      return {
+        profile: {
+          email: profileResult.data?.email ?? user?.email ?? null,
+          plan: subscriptionResult.data?.plan ?? "free",
+          is_active: subscriptionResult.data?.is_active ?? false,
+        } as UserProfile,
+        generationCount: usageResult.data?.palette_generations_count || 0,
+        lastGeneration: usageResult.data?.last_generation_at || null,
+        chatUsageCount: usageResult.data?.chat_messages_count || 0,
+      };
+    },
+  });
 
   const handleSelectPalette = (colors: string[]) => {
     handleViewChange("generator");
@@ -160,15 +148,10 @@ const Dashboard = () => {
     if (`${location.pathname}${location.search}` !== nextUrl) {
       navigate(nextUrl);
     }
-    if (nextView === "my-palettes" && user) {
-      fetchUserPalettes(user.id);
-    } else if (nextView === "uploads" && user) {
-      fetchUserAssets(user.id);
-    }
   };
 
   const resolveAssetUrls = async (items: UserAsset[]) => {
-    const resolved = await Promise.all(
+    return Promise.all(
       items.map(async (asset) => {
         if (asset.type !== "image") return asset;
         if (asset.url.startsWith("data:") || asset.url.startsWith("blob:")) {
@@ -213,26 +196,6 @@ const Dashboard = () => {
         return { ...asset, displayUrl: asset.url };
       })
     );
-    setUserAssets(resolved);
-  };
-
-  const fetchUserAssets = async (userId: string) => {
-    setLoadingAssets(true);
-    try {
-      const { data, error } = await supabase
-        .from("user_assets")
-        .select("id, type, url, filename, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      await resolveAssetUrls((data as UserAsset[]) || []);
-    } catch (error) {
-      console.error("Error fetching user assets:", error);
-      toast.error("Failed to load uploads");
-    } finally {
-      setLoadingAssets(false);
-    }
   };
 
   const deleteAsset = async (assetId: string, assetUrl: string, type: string) => {
@@ -253,49 +216,11 @@ const Dashboard = () => {
 
       if (error) throw error;
 
-      setUserAssets(prev => prev.filter(a => a.id !== assetId));
+      await queryClient.invalidateQueries({ queryKey: ["user-assets", user?.id] });
       toast.success("Upload deleted");
     } catch (error) {
       console.error("Error deleting asset:", error);
       toast.error("Failed to delete upload");
-    }
-  };
-
-  const fetchUserPalettes = async (userId: string) => {
-    setLoadingPalettes(true);
-    try {
-      const trySelect = async (select: string) => {
-        const { data, error } = await supabase
-          .from("public_palettes")
-          .select(select)
-          .eq("created_by", userId)
-          .order("created_at", { ascending: false });
-        return { data, error };
-      };
-
-      // Some deployments don't have `description` / `color_descriptions` columns yet.
-      // Try the richer select first, then fall back to a minimal one.
-      const primary = await trySelect(
-        "id, name, colors, tags, created_at, description, color_descriptions"
-      );
-
-      const isMissingColumn =
-        (primary.error as any)?.code === "42703" ||
-        String((primary.error as any)?.message || "").includes("does not exist");
-
-      if (primary.error && isMissingColumn) {
-        const fallback = await trySelect("id, name, colors, tags, created_at");
-        if (fallback.error) throw fallback.error;
-        setUserPalettes((fallback.data as any[]) || []);
-      } else {
-        if (primary.error) throw primary.error;
-        setUserPalettes((primary.data as any[]) || []);
-      }
-    } catch (error) {
-      console.error("Error fetching user palettes:", error);
-      toast.error("Failed to load palettes");
-    } finally {
-      setLoadingPalettes(false);
     }
   };
 
@@ -308,7 +233,7 @@ const Dashboard = () => {
 
       if (error) throw error;
 
-      setUserPalettes(prev => prev.filter(p => p.id !== paletteId));
+      await queryClient.invalidateQueries({ queryKey: ["user-palettes", user?.id] });
       toast.success("Palette deleted");
     } catch (error) {
       console.error("Error deleting palette:", error);
@@ -320,6 +245,78 @@ const Dashboard = () => {
     navigator.clipboard.writeText(colors.join(", "));
     toast.success("Copied all colors!");
   };
+
+  const palettesQuery = useQuery({
+    queryKey: ["user-palettes", user?.id],
+    enabled: Boolean(user?.id) && currentView === "my-palettes",
+    queryFn: async () => {
+      const userId = user?.id;
+      if (!userId) {
+        return [];
+      }
+
+      const trySelect = async (select: string) => {
+        const { data, error } = await supabase
+          .from("public_palettes")
+          .select(select)
+          .eq("created_by", userId)
+          .order("created_at", { ascending: false });
+        return { data, error };
+      };
+
+      const primary = await trySelect(
+        "id, name, colors, tags, created_at, description, color_descriptions"
+      );
+
+      const isMissingColumn =
+        (primary.error as any)?.code === "42703" ||
+        String((primary.error as any)?.message || "").includes("does not exist");
+
+      if (primary.error && isMissingColumn) {
+        const fallback = await trySelect("id, name, colors, tags, created_at");
+        if (fallback.error) throw fallback.error;
+        return (fallback.data as SavedPalette[]) || [];
+      }
+
+      if (primary.error) {
+        throw primary.error;
+      }
+
+      return (primary.data as SavedPalette[]) || [];
+    },
+  });
+
+  const assetsQuery = useQuery({
+    queryKey: ["user-assets", user?.id],
+    enabled: Boolean(user?.id) && currentView === "uploads",
+    queryFn: async () => {
+      const userId = user?.id;
+      if (!userId) {
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from("user_assets")
+        .select("id, type, url, filename, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return resolveAssetUrls((data as UserAsset[]) || []);
+    },
+  });
+
+  const profile = profileQuery.data?.profile ?? null;
+  const generationCount = profileQuery.data?.generationCount ?? 0;
+  const lastGeneration = profileQuery.data?.lastGeneration ?? null;
+  const chatUsageCount = profileQuery.data?.chatUsageCount ?? 0;
+  const userPalettes = palettesQuery.data ?? [];
+  const userAssets = assetsQuery.data ?? [];
+  const loadingPalettes = palettesQuery.isLoading || palettesQuery.isFetching;
+  const loadingAssets = assetsQuery.isLoading || assetsQuery.isFetching;
 
   const dashboardTourSteps = useMemo<TourStep[]>(
     () => [
