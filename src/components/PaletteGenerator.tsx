@@ -15,12 +15,29 @@ interface PaletteGeneratorProps {
   onHome?: () => void;
   onNewDesign?: () => void;
   showNewDesignButton?: boolean;
+  initialColors?: string[];
 }
 
-export function PaletteGenerator({ onBrowse, onHome, onNewDesign, showNewDesignButton }: PaletteGeneratorProps) {
-  const [colorSlots, setColorSlots] = useState<ColorSlot[]>(() => 
-    getRandomPalette().map(color => ({ color, locked: false }))
-  );
+export function PaletteGenerator({
+  onBrowse,
+  onHome,
+  onNewDesign,
+  showNewDesignButton,
+  initialColors,
+}: PaletteGeneratorProps) {
+  const [colorSlots, setColorSlots] = useState<ColorSlot[]>(() => {
+    const sourceColors =
+      initialColors && initialColors.length > 0 ? initialColors : getRandomPalette();
+    return sourceColors.map((color) => ({ color, locked: false }));
+  });
+
+  useEffect(() => {
+    if (!initialColors || initialColors.length === 0) {
+      return;
+    }
+
+    setColorSlots(initialColors.map((color) => ({ color, locked: false })));
+  }, [initialColors]);
 
   const generateNewPalette = useCallback(() => {
     const newColors = Math.random() > 0.3 ? getRandomPalette() : generateRandomColors();

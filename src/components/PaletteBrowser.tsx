@@ -305,6 +305,14 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
     setSelectedPalette(palette);
   }, []);
 
+  const handleUsePalette = useCallback(
+    (colors: string[]) => {
+      setSelectedPalette(null);
+      onSelectPalette(colors);
+    },
+    [onSelectPalette]
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -381,6 +389,7 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
         <PaletteModal 
           palette={selectedPalette} 
           onClose={() => setSelectedPalette(null)} 
+          onUsePalette={handleUsePalette}
         />
       )}
     </div>

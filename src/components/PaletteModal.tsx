@@ -12,6 +12,7 @@ import {
 interface PaletteModalProps {
   palette: Palette;
   onClose: () => void;
+  onUsePalette?: (colors: string[]) => void;
 }
 
 function getContrastColor(hex: string): string {
@@ -65,7 +66,7 @@ function generateArray(colors: string[]): string {
   return `const colors = ${JSON.stringify(colors, null, 2)};`;
 }
 
-export function PaletteModal({ palette, onClose }: PaletteModalProps) {
+export function PaletteModal({ palette, onClose, onUsePalette }: PaletteModalProps) {
   const [hoveredColor, setHoveredColor] = useState<number | null>(null);
 
   const copyColor = (color: string) => {
@@ -140,6 +141,14 @@ export function PaletteModal({ palette, onClose }: PaletteModalProps) {
         <div className="p-4 flex items-center justify-between border-b border-border">
           <h2 className="text-xl font-semibold text-foreground">{palette.name}</h2>
           <div className="flex items-center gap-2">
+            {onUsePalette && (
+              <button
+                onClick={() => onUsePalette(palette.colors)}
+                className="px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground"
+              >
+                Use in Builder
+              </button>
+            )}
             {/* Copy as dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
