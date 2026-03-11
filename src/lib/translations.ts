@@ -142,6 +142,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "explore.shareLinkCopied": "Share link copied!",
 
     "freeBuilder.newBuilder": "New Builder",
+    "freeBuilder.share": "Share URL",
+    "freeBuilder.shareCopied": "Builder link copied!",
+    "freeBuilder.undo": "Undo",
+    "freeBuilder.redo": "Redo",
     "freeBuilder.save": "Save",
     "freeBuilder.export": "Export",
     "freeBuilder.browse": "Browse Palettes",
@@ -359,6 +363,10 @@ export const translations: Record<Language, Record<string, string>> = {
     "explore.shareLinkCopied": "Share-Link kopiert!",
 
     "freeBuilder.newBuilder": "Neuer Builder",
+    "freeBuilder.share": "URL teilen",
+    "freeBuilder.shareCopied": "Builder-Link kopiert!",
+    "freeBuilder.undo": "Rueckgaengig",
+    "freeBuilder.redo": "Wiederholen",
     "freeBuilder.save": "Speichern",
     "freeBuilder.export": "Exportieren",
     "freeBuilder.browse": "Paletten entdecken",

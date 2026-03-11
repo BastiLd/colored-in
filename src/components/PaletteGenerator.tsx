@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Copy, Lock, Unlock, RefreshCw, ChevronRight, Save } from "lucide-react";
+import { Copy, Lock, Unlock, RefreshCw, ChevronRight, Save, Share2, Undo2, Redo2 } from "lucide-react";
 import { toast } from "sonner";
 import { getRandomPalette, generateRandomColors } from "@/data/palettes";
 import { supabase } from "@/integrations/supabase/client";
 import { GuidedTour, type TourStep } from "@/components/GuidedTour";
 import { useLanguage } from "@/components/LanguageProvider";
+import { buildBuilderSearch } from "@/lib/paletteUrl";
 
 interface ColorSlot {
   color: string;
@@ -19,6 +20,32 @@ interface PaletteGeneratorProps {
   initialColors?: string[];
 }
 
+type HistoryState = {
+  entries: ColorSlot[][];
+  index: number;
+};
+
+function createSlots(colors: string[]) {
+  return colors.map((color) => ({ color, locked: false }));
+}
+
+function getInitialSlots(initialColors?: string[]) {
+  const sourceColors =
+    initialColors && initialColors.length > 0 ? initialColors : getRandomPalette();
+  return createSlots(sourceColors);
+}
+
+function areSlotsEqual(left: ColorSlot[], right: ColorSlot[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every(
+    (slot, index) =>
+      slot.color === right[index]?.color && slot.locked === right[index]?.locked
+  );
+}
+
 export function PaletteGenerator({
   onBrowse,
   onHome,
@@ -27,36 +54,98 @@ export function PaletteGenerator({
   initialColors,
 }: PaletteGeneratorProps) {
   const { t } = useLanguage();
-  const [colorSlots, setColorSlots] = useState<ColorSlot[]>(() => {
-    const sourceColors =
-      initialColors && initialColors.length > 0 ? initialColors : getRandomPalette();
-    return sourceColors.map((color) => ({ color, locked: false }));
+  const [historyState, setHistoryState] = useState<HistoryState>(() => {
+    const initialSlots = getInitialSlots(initialColors);
+    return {
+      entries: [initialSlots],
+      index: 0,
+    };
   });
+  const colorSlots = historyState.entries[historyState.index] ?? [];
+
+  const pushSnapshot = useCallback((nextSlots: ColorSlot[]) => {
+    setHistoryState((prev) => {
+      const current = prev.entries[prev.index] ?? [];
+      if (areSlotsEqual(current, nextSlots)) {
+        return prev;
+      }
+
+      const nextEntries = [...prev.entries.slice(0, prev.index + 1), nextSlots];
+      return {
+        entries: nextEntries,
+        index: nextEntries.length - 1,
+      };
+    });
+  }, []);
 
   useEffect(() => {
     if (!initialColors || initialColors.length === 0) {
       return;
     }
 
-    setColorSlots(initialColors.map((color) => ({ color, locked: false })));
-  }, [initialColors]);
+    pushSnapshot(createSlots(initialColors));
+  }, [initialColors, pushSnapshot]);
+
+  useEffect(() => {
+    if (!window.location.pathname.includes("/builder")) {
+      return;
+    }
+
+    const nextSearch = buildBuilderSearch(colorSlots.map((slot) => slot.color));
+    const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash}`;
+    window.history.replaceState(window.history.state, "", nextUrl);
+  }, [colorSlots]);
 
   const generateNewPalette = useCallback(() => {
     const newColors = Math.random() > 0.3 ? getRandomPalette() : generateRandomColors();
-    setColorSlots(prev => 
-      prev.map((slot, i) => 
-        slot.locked ? slot : { color: newColors[i] || generateRandomColors(1)[0], locked: false }
-      )
+    const nextSlots = colorSlots.map((slot, index) =>
+      slot.locked
+        ? slot
+        : { color: newColors[index] || generateRandomColors(1)[0], locked: false }
+    );
+    pushSnapshot(nextSlots);
+  }, [colorSlots, pushSnapshot]);
+
+  const toggleLock = useCallback((index: number) => {
+    const nextSlots = colorSlots.map((slot, slotIndex) =>
+      slotIndex === index ? { ...slot, locked: !slot.locked } : slot
+    );
+    pushSnapshot(nextSlots);
+  }, [colorSlots, pushSnapshot]);
+
+  const undo = useCallback(() => {
+    setHistoryState((prev) =>
+      prev.index === 0
+        ? prev
+        : {
+            ...prev,
+            index: prev.index - 1,
+          }
     );
   }, []);
 
-  const toggleLock = useCallback((index: number) => {
-    setColorSlots(prev => 
-      prev.map((slot, i) => 
-        i === index ? { ...slot, locked: !slot.locked } : slot
-      )
+  const redo = useCallback(() => {
+    setHistoryState((prev) =>
+      prev.index >= prev.entries.length - 1
+        ? prev
+        : {
+            ...prev,
+            index: prev.index + 1,
+          }
     );
   }, []);
+
+  const copyShareUrl = useCallback(() => {
+    const baseUrl = import.meta.env.BASE_URL === "/" ? "/" : import.meta.env.BASE_URL;
+    const shareUrl = `${window.location.origin}${baseUrl}builder${buildBuilderSearch(
+      colorSlots.map((slot) => slot.color)
+    )}`;
+    navigator.clipboard.writeText(shareUrl);
+    toast.success(t("freeBuilder.shareCopied", "Builder link copied!"), {
+      duration: 1500,
+      position: "bottom-center",
+    });
+  }, [colorSlots, t]);
 
   const copyColor = useCallback((color: string) => {
     navigator.clipboard.writeText(color);
@@ -77,6 +166,8 @@ export function PaletteGenerator({
 
   const lockedColors = colorSlots.filter(s => s.locked).map(s => s.color);
   const canSave = lockedColors.length >= 3;
+  const canUndo = historyState.index > 0;
+  const canRedo = historyState.index < historyState.entries.length - 1;
 
   const tourSteps = useMemo<TourStep[]>(
     () => [
@@ -148,6 +239,22 @@ export function PaletteGenerator({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.code === "KeyZ") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        return;
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.code === "KeyY") {
+        e.preventDefault();
+        redo();
+        return;
+      }
+
       if (e.code === "Space" && e.target === document.body) {
         e.preventDefault();
         generateNewPalette();
@@ -155,7 +262,7 @@ export function PaletteGenerator({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [generateNewPalette]);
+  }, [generateNewPalette, redo, undo]);
 
   const getContrastColor = (hex: string): string => {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -187,6 +294,26 @@ export function PaletteGenerator({
           )}
 
           <button
+            onClick={undo}
+            disabled={!canUndo}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title={t("freeBuilder.undo", "Undo")}
+          >
+            <Undo2 className="w-4 h-4" />
+            {t("freeBuilder.undo", "Undo")}
+          </button>
+
+          <button
+            onClick={redo}
+            disabled={!canRedo}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title={t("freeBuilder.redo", "Redo")}
+          >
+            <Redo2 className="w-4 h-4" />
+            {t("freeBuilder.redo", "Redo")}
+          </button>
+
+          <button
             onClick={savePalette}
             disabled={!canSave}
             data-tour="free-save"
@@ -208,6 +335,14 @@ export function PaletteGenerator({
           >
             <Copy className="w-4 h-4" />
             {t("freeBuilder.export", "Export")}
+          </button>
+
+          <button
+            onClick={copyShareUrl}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary hover:bg-muted rounded-lg transition-colors"
+          >
+            <Share2 className="w-4 h-4" />
+            {t("freeBuilder.share", "Share URL")}
           </button>
           
           <button
