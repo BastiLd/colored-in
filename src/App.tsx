@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // Lazy-loaded route components for code splitting
 const Index = lazy(() => import("./pages/Index"));
+const Builder = lazy(() => import("./pages/Builder"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Pricing = lazy(() => import("./pages/Pricing"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -41,6 +42,7 @@ const App = () => (
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/builder" element={<Builder />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/pricing" element={<Pricing />} />
             <Route path="/dashboard" element={<Dashboard />} />
