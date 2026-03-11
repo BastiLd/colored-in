@@ -423,10 +423,10 @@ export function HomePage({
 
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">
-                Manual Generator works without an account.
+                Use the Manual Generator instantly without an account.
               </p>
               <p className="text-sm text-muted-foreground italic">
-                Sign in only for Pro tools like assets, Ask Mode, and saved palettes.
+                Upgrade for the Pro Manual Builder with assets, Ask Mode, saved palettes, and higher limits.
               </p>
             </div>
           </div>
@@ -462,7 +462,7 @@ export function HomePage({
 
           {/* Feature Cards with Images */}
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Feature 1: Manual Builder */}
+            {/* Feature 1: Free Manual Builder */}
             <div className="group bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all hover:shadow-xl">
               <div className="relative mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-primary/20 to-accent/20 aspect-video flex items-center justify-center">
                 {/* Builder Preview Illustration */}
@@ -478,9 +478,10 @@ export function HomePage({
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">Pro Manual Builder</h3>
+              <p className="text-xs uppercase tracking-[0.2em] text-primary/70 mb-2">Free</p>
+              <h3 className="text-xl font-semibold mb-2">Manual Generator</h3>
               <p className="text-sm text-muted-foreground">
-                Need more than the free Manual Generator? Unlock assets, Ask Mode, saving, and advanced palette tools with Pro.
+                Start fast with the normal Manual Generator. Pick colors, lock favorites, regenerate, and export without creating an account.
               </p>
             </div>
 
@@ -502,7 +503,7 @@ export function HomePage({
               </p>
             </div>
 
-            {/* Feature 3: Asset Analysis */}
+            {/* Feature 3: Pro Builder */}
             <div className="group bg-card border border-border rounded-2xl p-6 hover:border-primary/50 transition-all hover:shadow-xl">
               <div className="relative mb-6 rounded-xl overflow-hidden bg-gradient-to-br from-purple-500/20 to-pink-500/20 aspect-video flex items-center justify-center">
                 <div className="w-full h-full flex flex-col items-center justify-center space-y-3">
@@ -516,9 +517,10 @@ export function HomePage({
                   </div>
                 </div>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Asset Analysis</h3>
+              <p className="text-xs uppercase tracking-[0.2em] text-primary/70 mb-2">Pro</p>
+              <h3 className="text-xl font-semibold mb-2">Pro Manual Builder</h3>
               <p className="text-sm text-muted-foreground">
-                Upload images or add website links. AI analyzes them and generates matching color palettes automatically.
+                Need more power? Unlock assets, Ask Mode, palette saving, and advanced editing tools in the Pro Manual Builder.
               </p>
             </div>
           </div>
@@ -609,7 +611,7 @@ export function HomePage({
           {
             id: "manual-gen",
             title: "Manual Generator",
-            description: "Prefer full control? Use the manual generator to pick and customize every color.",
+            description: "Open the free Manual Generator right away. No account is needed for the normal builder.",
             selector: "#home-manual-btn",
             placement: "bottom",
           },
@@ -623,7 +625,7 @@ export function HomePage({
           {
             id: "pricing",
             title: "Upgrade for More",
-            description: "Check out Pro, Ultra, and Individual plans for unlimited AI generations, Chrome Extension, and more!",
+            description: "Compare Pro plans if you want the Pro Manual Builder, assets, Ask Mode, saved palettes, and higher limits.",
             selector: "#home-pricing-btn",
             placement: "bottom",
           },
