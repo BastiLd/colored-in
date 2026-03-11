@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Mail, Lock, Loader2, Sparkles } from "lucide-react";
 import { useAccessState } from "@/hooks/useAccessState";
+import { useLanguage } from "@/components/LanguageProvider";
 
 // List of known temporary/disposable email domains
 const TEMP_EMAIL_DOMAINS = [
@@ -90,6 +91,7 @@ export default function Auth() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const access = useAccessState();
+  const { t } = useLanguage();
   const redirectTarget = searchParams.get("redirect") || "/dashboard";
   const showDebug =
     import.meta.env.DEV || new URLSearchParams(window.location.search).has("debug");
@@ -109,18 +111,18 @@ export default function Auth() {
     }
 
     if (!email || !password) {
-      toast.error("Please fill in all fields");
+      toast.error(t("auth.fillAll", "Please fill in all fields"));
       return;
     }
 
     if (password.length < 8) {
-      toast.error("Password must be at least 8 characters");
+      toast.error(t("auth.passwordTooShort", "Password must be at least 8 characters"));
       return;
     }
 
     // Check for temporary email on signup
     if (!isLogin && isTemporaryEmail(email)) {
-      toast.error("Temporary/disposable email addresses are not allowed. Please use a real email address.");
+      toast.error(t("auth.tempEmail", "Temporary or disposable email addresses are not allowed. Please use a real email address."));
       return;
     }
 
@@ -133,7 +135,7 @@ export default function Auth() {
           password,
         });
         if (error) throw error;
-        toast.success("Welcome back!");
+        toast.success(t("auth.welcomeToast", "Welcome back!"));
       } else {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -145,22 +147,22 @@ export default function Auth() {
         });
         if (error) {
           if (error.message.includes("already registered")) {
-            toast.error("This email is already registered. Please login instead.");
+            toast.error(t("auth.emailExists", "This email is already registered. Please sign in instead."));
             setIsLogin(true);
           } else {
             throw error;
           }
         } else if (data.session) {
-          toast.success("Account created! You're signed in.");
+          toast.success(t("auth.createdSignedIn", "Account created! You're signed in."));
           navigate(redirectTarget, { replace: true });
         } else {
           // Email confirmation flow: user exists but no session yet.
-          toast.success("Account created! Please check your email to confirm your account.");
+          toast.success(t("auth.createdConfirm", "Account created! Please check your email to confirm your account."));
         }
       }
     } catch (error: any) {
       console.error("Auth error:", error);
-      toast.error(error.message || "Authentication failed");
+      toast.error(error.message || t("auth.failed", "Authentication failed"));
     } finally {
       setIsLoading(false);
     }
@@ -173,27 +175,27 @@ export default function Auth() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary mb-4">
               <Sparkles className="w-5 h-5" />
-              <span className="font-medium">AI Palette Generator</span>
+              <span className="font-medium">{t("auth.badge", "AI Palette Generator")}</span>
             </div>
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              {isLogin ? "Welcome Back" : "Create Account"}
+              {isLogin ? t("auth.welcomeBack", "Welcome Back") : t("auth.createAccount", "Create Account")}
             </h1>
             <p className="text-muted-foreground text-sm">
               {isLogin 
-                ? "Sign in to use AI palette generation" 
-                : "Sign up to get 1 free AI palette generation"}
+                ? t("auth.loginText", "Sign in to generate palettes, save your work, and manage Pro tools.")
+                : t("auth.signupText", "Create an account to save palettes and unlock Pro features later.")}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("auth.email", "Email")}</Label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="email"
                   type="email"
-                  placeholder="your@email.com"
+                  placeholder={t("auth.emailPlaceholder", "your@email.com")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
@@ -203,13 +205,13 @@ export default function Auth() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("auth.password", "Password")}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   id="password"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder={t("auth.passwordPlaceholder", "Enter your password")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
@@ -222,9 +224,9 @@ export default function Auth() {
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : isLogin ? (
-                "Sign In"
+                t("auth.signIn", "Sign In")
               ) : (
-                "Sign Up"
+                t("auth.signUp", "Sign Up")
               )}
             </Button>
           </form>
@@ -236,8 +238,8 @@ export default function Auth() {
               disabled={isLoading}
             >
               {isLogin
-                ? "Don't have an account? Sign up"
-                : "Already have an account? Sign in"}
+                ? t("auth.switchToSignup", "Don't have an account? Sign up")
+                : t("auth.switchToSignin", "Already have an account? Sign in")}
             </button>
           </div>
 
@@ -246,7 +248,7 @@ export default function Auth() {
               onClick={() => navigate("/")}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              ← Back to home
+              {`<- ${t("auth.backHome", "Back to home")}`}
             </button>
           </div>
 

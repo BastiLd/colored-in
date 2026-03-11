@@ -5,6 +5,7 @@ import { type Palette, getPalettesByPlan, searchAllPalettesAsync } from "@/data/
 import { Input } from "@/components/ui/input";
 import { PaletteModal } from "./PaletteModal";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/components/LanguageProvider";
 
 interface PaletteBrowserProps {
   onBack: () => void;
@@ -109,6 +110,7 @@ const PaletteCard = memo(function PaletteCard({
 });
 
 export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps) {
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [selectedPalette, setSelectedPalette] = useState<Palette | null>(null);
@@ -329,7 +331,7 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search palettes..."
+            placeholder={t("explore.searchPlaceholder", "Search palettes...")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 bg-secondary border-border"
@@ -339,16 +341,16 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
         <div className="text-sm text-muted-foreground flex items-center gap-2">
           {searching && <Loader2 className="w-4 h-4 animate-spin" />}
           {debouncedQuery && debouncedQuery.length >= 2
-            ? `${filteredPalettes.length.toLocaleString()} results${filteredPalettes.length >= 200 ? ' (max 200)' : ''}`
-            : `${(staticPalettesRef.current.length + dbPalettesRef.current.length).toLocaleString()} / ${(total + dbPalettesRef.current.length).toLocaleString()} loaded`
+            ? `${filteredPalettes.length.toLocaleString()} ${t("explore.results", "results")}${filteredPalettes.length >= 200 ? ` ${t("explore.max200", "(max 200)")}` : ""}`
+            : `${(staticPalettesRef.current.length + dbPalettesRef.current.length).toLocaleString()} / ${(total + dbPalettesRef.current.length).toLocaleString()} ${t("explore.loaded", "loaded")}`
           }
         </div>
       </header>
 
       {/* Title */}
       <div className="px-6 py-8">
-        <h2 className="text-4xl font-bold font-display text-foreground">Trending Color Palettes</h2>
-        <p className="text-muted-foreground mt-2">Get inspired by 50,000+ beautiful color schemes.</p>
+        <h2 className="text-4xl font-bold font-display text-foreground">{t("explore.title", "Trending Color Palettes")}</h2>
+        <p className="text-muted-foreground mt-2">{t("explore.subtitle", "Get inspired by 50,000+ beautiful color schemes.")}</p>
       </div>
 
       {/* Grid */}
@@ -372,8 +374,8 @@ export function PaletteBrowser({ onBack, onSelectPalette }: PaletteBrowserProps)
 
         {filteredPalettes.length === 0 && isInitialized && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-lg text-muted-foreground">No palettes found</p>
-            <p className="text-sm text-muted-foreground mt-1">Try a different search term</p>
+            <p className="text-lg text-muted-foreground">{t("explore.noResults", "No palettes found")}</p>
+            <p className="text-sm text-muted-foreground mt-1">{t("explore.noResultsHint", "Try a different search term")}</p>
           </div>
         )}
         

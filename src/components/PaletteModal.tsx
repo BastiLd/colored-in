@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLanguage } from "@/components/LanguageProvider";
 
 interface PaletteModalProps {
   palette: Palette;
@@ -67,6 +68,7 @@ function generateArray(colors: string[]): string {
 }
 
 export function PaletteModal({ palette, onClose, onUsePalette }: PaletteModalProps) {
+  const { t } = useLanguage();
   const [hoveredColor, setHoveredColor] = useState<number | null>(null);
 
   const copyColor = (color: string) => {
@@ -146,7 +148,7 @@ export function PaletteModal({ palette, onClose, onUsePalette }: PaletteModalPro
                 onClick={() => onUsePalette(palette.colors)}
                 className="px-3 py-2 rounded-lg hover:bg-secondary transition-colors text-sm text-muted-foreground"
               >
-                Use in Builder
+                {t("explore.useInBuilder", "Use in Builder")}
               </button>
             )}
             {/* Copy as dropdown */}
@@ -184,7 +186,7 @@ export function PaletteModal({ palette, onClose, onUsePalette }: PaletteModalPro
               onClick={() => {
                 const shareUrl = `${window.location.origin}${import.meta.env.BASE_URL}explore?palette=${palette.id}`;
                 navigator.clipboard.writeText(shareUrl);
-                toast.success("Share link copied!", { duration: 1500, position: "bottom-center" });
+                toast.success(t("explore.shareLinkCopied", "Share link copied!"), { duration: 1500, position: "bottom-center" });
               }}
               className="p-2 rounded-lg hover:bg-secondary transition-colors"
               title="Share palette"

@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useLanguage } from "@/components/LanguageProvider";
 
 interface SubscriptionData {
   plan: string;
@@ -53,6 +54,7 @@ const Settings = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [saveChatHistory, setSaveChatHistory] = useState(false);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const { language, setLanguage, t } = useLanguage();
 
   useEffect(() => {
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
@@ -383,7 +385,7 @@ const Settings = () => {
           className="flex items-center gap-3 p-2 -ml-2 rounded-lg hover:bg-muted transition-colors cursor-pointer"
         >
           <ArrowLeft className="h-5 w-5" />
-          <h1 className="text-xl font-bold">Safety Settings</h1>
+          <h1 className="text-xl font-bold">{t("settings.title", "Safety Settings")}</h1>
         </button>
       </header>
 
@@ -395,8 +397,8 @@ const Settings = () => {
               <Shield className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h2 className="font-semibold">Security</h2>
-              <p className="text-sm text-muted-foreground">Manage your account security</p>
+              <h2 className="font-semibold">{t("settings.security", "Security")}</h2>
+              <p className="text-sm text-muted-foreground">{t("settings.securityText", "Manage your account security")}</p>
             </div>
           </div>
 
@@ -404,19 +406,19 @@ const Settings = () => {
           <div className="border-t border-border pt-6">
             <div className="flex items-center gap-3 mb-4">
               <Lock className="h-5 w-5 text-muted-foreground" />
-              <h3 className="font-medium">Change Password</h3>
+              <h3 className="font-medium">{t("settings.changePassword", "Change Password")}</h3>
             </div>
 
             <form onSubmit={handlePasswordChange} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
+                <Label htmlFor="newPassword">{t("settings.newPassword", "New Password")}</Label>
                 <div className="relative">
                   <Input
                     id="newPassword"
                     type={showNewPassword ? "text" : "password"}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
+                    placeholder={t("settings.newPasswordPlaceholder", "Enter new password")}
                     className="pr-10"
                   />
                   <button
@@ -430,14 +432,14 @@ const Settings = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <Label htmlFor="confirmPassword">{t("settings.confirmPassword", "Confirm New Password")}</Label>
                 <div className="relative">
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm new password"
+                    placeholder={t("settings.confirmPasswordPlaceholder", "Confirm new password")}
                     className="pr-10"
                   />
                   <button
@@ -451,19 +453,19 @@ const Settings = () => {
               </div>
 
               <Button type="submit" disabled={isUpdating || !newPassword || !confirmPassword}>
-                {isUpdating ? "Updating..." : "Update Password"}
+                {isUpdating ? t("settings.updating", "Updating...") : t("settings.updatePassword", "Update Password")}
               </Button>
               
               <div className="pt-4 border-t border-border">
                 <p className="text-sm text-muted-foreground mb-3">
-                  Or reset your password via email
+                  {t("settings.resetViaEmail", "Or reset your password via email")}
                 </p>
                 <Button 
                   type="button" 
                   variant="outline" 
                   onClick={handlePasswordResetEmail}
                 >
-                  Send Password Reset Email
+                  {t("settings.sendResetEmail", "Send Password Reset Email")}
                 </Button>
               </div>
             </form>
@@ -472,15 +474,47 @@ const Settings = () => {
 
         {/* User Settings */}
         <div className="mt-6 bg-card border border-border rounded-xl p-6">
-          <h3 className="font-medium mb-4">Preferences</h3>
+          <h3 className="font-medium mb-4">{t("settings.preferences", "Preferences")}</h3>
           
-          {/* Chat History Toggle */}
           <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <Label>{t("settings.languageTitle", "Language")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t(
+                    "settings.languageText",
+                    "Choose the interface language. Guests are stored locally, signed-in users are synced to their account."
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant={language === "en" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => void setLanguage("en")}
+                >
+                  {t("language.english", "English")}
+                </Button>
+                <Button
+                  type="button"
+                  variant={language === "de" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => void setLanguage("de")}
+                >
+                  {t("language.german", "Deutsch")}
+                </Button>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <Label htmlFor="chat-history">Save Ask Mode Chat History</Label>
+                <Label htmlFor="chat-history">{t("settings.chatHistoryTitle", "Save Ask Mode Chat History")}</Label>
                 <p className="text-sm text-muted-foreground">
-                  When enabled, your Ask Mode conversations will be saved and restored when you return.
+                  {t(
+                    "settings.chatHistoryText",
+                    "When enabled, your Ask Mode conversations will be saved and restored when you return."
+                  )}
                 </p>
               </div>
               <Switch
@@ -495,14 +529,14 @@ const Settings = () => {
 
         {/* Account Info */}
         <div className="mt-6 bg-card border border-border rounded-xl p-6">
-          <h3 className="font-medium mb-4">Account Information</h3>
+          <h3 className="font-medium mb-4">{t("settings.accountInfo", "Account Information")}</h3>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Email</span>
+              <span className="text-sm text-muted-foreground">{t("settings.accountEmail", "Email")}</span>
               <span className="text-sm font-medium">{user?.email}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Account Created</span>
+              <span className="text-sm text-muted-foreground">{t("settings.accountCreated", "Account Created")}</span>
               <span className="text-sm font-medium">
                 {user?.created_at ? new Date(user.created_at).toLocaleDateString() : "-"}
               </span>
@@ -517,8 +551,8 @@ const Settings = () => {
               <CreditCard className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h2 className="font-semibold">Subscription</h2>
-              <p className="text-sm text-muted-foreground">Manage your subscription and billing</p>
+              <h2 className="font-semibold">{t("settings.subscription", "Subscription")}</h2>
+              <p className="text-sm text-muted-foreground">{t("settings.subscriptionText", "Manage your subscription and billing")}</p>
             </div>
           </div>
 
@@ -528,16 +562,16 @@ const Settings = () => {
               <div className="flex items-center gap-3">
                 <Crown className="h-5 w-5 text-amber-500" />
                 <div>
-                  <span className="text-sm text-muted-foreground">Current Plan</span>
+                  <span className="text-sm text-muted-foreground">{t("settings.currentPlan", "Current Plan")}</span>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">
                       {PLAN_NAMES[subscription?.plan || "free"]}
                     </span>
                     {subscription?.is_active && subscription?.plan !== "free" && (
-                      <Badge variant="default" className="bg-green-500">Active</Badge>
+                      <Badge variant="default" className="bg-green-500">{t("settings.active", "Active")}</Badge>
                     )}
                     {!subscription?.is_active && subscription?.plan !== "free" && (
-                      <Badge variant="destructive">Inactive</Badge>
+                      <Badge variant="destructive">{t("settings.inactive", "Inactive")}</Badge>
                     )}
                   </div>
                 </div>
@@ -547,7 +581,7 @@ const Settings = () => {
                 size="sm"
                 onClick={() => navigate("/pricing")}
               >
-                {subscription?.plan === "free" ? "Upgrade" : "Change Plan"}
+                {subscription?.plan === "free" ? t("settings.upgrade", "Upgrade") : t("settings.changePlan", "Change Plan")}
               </Button>
             </div>
 
@@ -555,7 +589,7 @@ const Settings = () => {
             {subscription?.expires_at && subscription?.plan !== "free" && (
               <div className="flex items-center justify-between pt-3 border-t border-border">
                 <div>
-                  <span className="text-sm text-muted-foreground">Next Billing Date</span>
+                  <span className="text-sm text-muted-foreground">{t("settings.nextBillingDate", "Next Billing Date")}</span>
                   <p className="font-medium">
                     {new Date(subscription.expires_at).toLocaleDateString("en-US", {
                       year: "numeric",
@@ -581,12 +615,12 @@ const Settings = () => {
                     {isLoadingPortal ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Loading...
+                        {t("settings.loading", "Loading...")}
                       </>
                     ) : (
                       <>
                         <ExternalLink className="w-4 h-4 mr-2" />
-                        Manage Billing
+                        {t("settings.manageBilling", "Manage Billing")}
                       </>
                     )}
                   </Button>
@@ -600,7 +634,7 @@ const Settings = () => {
                       className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
                       disabled={isCanceling}
                     >
-                      {subscription?.stripe_subscription_id ? "Cancel Subscription" : "Reset to Free"}
+                      {subscription?.stripe_subscription_id ? t("settings.cancelSubscription", "Cancel Subscription") : t("settings.resetToFree", "Reset to Free")}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -627,12 +661,12 @@ const Settings = () => {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Keep Plan</AlertDialogCancel>
+                      <AlertDialogCancel>{t("settings.keepPlan", "Keep Plan")}</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={handleCancelSubscription}
                         className="bg-red-500 hover:bg-red-600"
                       >
-                        {isCanceling ? "Processing..." : (subscription?.stripe_subscription_id ? "Yes, Cancel" : "Yes, Reset to Free")}
+                        {isCanceling ? t("settings.processing", "Processing...") : (subscription?.stripe_subscription_id ? t("settings.cancelSubscription", "Cancel Subscription") : t("settings.resetToFree", "Reset to Free"))}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
@@ -645,10 +679,10 @@ const Settings = () => {
               <div className="pt-3 border-t border-border">
                 <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-lg p-4">
                   <p className="text-sm text-muted-foreground mb-3">
-                    Upgrade to unlock unlimited AI generations, premium palettes, and more.
+                    {t("settings.upgradeText", "Upgrade to unlock unlimited AI generations, premium palettes, and more.")}
                   </p>
                   <Button onClick={() => navigate("/pricing")} size="sm">
-                    View Plans
+                    {t("settings.viewPlans", "View Plans")}
                   </Button>
                 </div>
               </div>
@@ -707,7 +741,7 @@ const Settings = () => {
               <AlertTriangle className="h-5 w-5 text-red-500" />
             </div>
             <div>
-              <h3 className="font-semibold text-red-500">Danger Zone</h3>
+              <h3 className="font-semibold text-red-500">{t("settings.dangerTitle", "Danger Zone")}</h3>
               <p className="text-sm text-muted-foreground">Irreversible actions</p>
             </div>
           </div>
@@ -715,7 +749,7 @@ const Settings = () => {
           <div className="border-t border-red-500/20 pt-4">
             <div className="flex items-start justify-between">
               <div className="flex-1">
-                <h4 className="font-medium mb-1">Delete Account</h4>
+                <h4 className="font-medium mb-1">{t("settings.deleteAccount", "Delete Account")}</h4>
                 <p className="text-sm text-muted-foreground">
                   Permanently delete your account and all associated data. This action cannot be undone.
                 </p>
@@ -729,12 +763,12 @@ const Settings = () => {
                     disabled={isDeleting}
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Account
+                    {t("settings.deleteAccount", "Delete Account")}
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogTitle>{t("settings.deleteConfirmTitle", "Are you absolutely sure?")}</AlertDialogTitle>
                     <AlertDialogDescription>
                       This action cannot be undone. This will permanently delete your account
                       and remove all your data including:
@@ -752,7 +786,7 @@ const Settings = () => {
                       onClick={handleDeleteAccount}
                       className="bg-red-500 hover:bg-red-600"
                     >
-                      {isDeleting ? "Deleting..." : "Yes, delete my account"}
+                      {isDeleting ? t("settings.deleting", "Deleting...") : t("settings.deleteMyAccount", "Yes, delete my account")}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>

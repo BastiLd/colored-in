@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLanguage } from "@/components/LanguageProvider";
 
 interface HomePageProps {
   onStartGenerator: () => void;
@@ -320,6 +321,7 @@ export function HomePage({
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const access = useAccessState();
+  const { t } = useLanguage();
   const featuredPalette = palettes[featuredIndex];
   const palettesReady = palettes.length > 0;
 
@@ -333,7 +335,7 @@ export function HomePage({
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    toast.success("Signed out");
+    toast.success(t("home.signedOut", "Signed out"));
   };
 
   // Handle Manual Generator click with plan check
@@ -353,22 +355,22 @@ export function HomePage({
         <h1 className="text-xl font-bold text-gradient font-display">Colored In</h1>
         <nav className="flex items-center gap-4" aria-label="Main navigation">
           <button id="home-pricing-btn" onClick={() => navigate("/pricing")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Go Pro
+            {t("home.goPro", "Go Pro")}
           </button>
           {access.isLoading ? (
             <Skeleton className="w-24 h-9 rounded-lg" />
           ) : access.isGuest ? (
             <>
               <button onClick={() => navigate("/auth")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Sign in
+                {t("home.signIn", "Sign in")}
               </button>
               <button onClick={() => navigate("/auth")} className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
-                Sign up
+                {t("home.signUp", "Sign up")}
               </button>
             </>
           ) : (
             <button onClick={() => navigate("/dashboard")} className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity">
-              Dashboard
+              {t("home.dashboard", "Dashboard")}
             </button>
           )}
         </nav>
@@ -386,11 +388,11 @@ export function HomePage({
             <DropdownMenuContent align="start" side="top" className="w-48">
               <DropdownMenuItem onClick={() => navigate("/dashboard")}>
                 <UserIcon className="h-4 w-4 mr-2" />
-                Dashboard
+                {t("home.dashboard", "Dashboard")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                 <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
+                {t("dashboard.signOut", "Sign Out")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -405,28 +407,28 @@ export function HomePage({
             <div className="space-y-4">
               <AnimatedTitle />
               <p className="text-lg text-muted-foreground max-w-md">
-                Create the perfect palette or get inspired by thousands of beautiful color schemes.
+                {t("home.heroText", "Create the perfect palette or get inspired by thousands of beautiful color schemes.")}
               </p>
             </div>
 
             <div className="flex flex-wrap gap-4">
               <button id="home-ai-btn" onClick={() => setShowAIGenerator(true)} className="px-6 py-3 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-all shadow-lg hover:scale-105">
-                Generate with AI
+                {t("home.generateAi", "Generate with AI")}
               </button>
               <button id="home-manual-btn" onClick={handleManualGenerator} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors hover:scale-105">
-                Manual Generator
+                {t("home.manualCta", "Manual Generator")}
               </button>
               <button id="home-explore-btn" onClick={onBrowsePalettes} className="px-6 py-3 text-sm font-medium bg-secondary text-secondary-foreground border border-border rounded-lg hover:bg-muted transition-colors hover:scale-105">
-                Explore 50.000+ Palettes
+                {t("home.exploreCta", "Explore 50,000+ Palettes")}
               </button>
             </div>
 
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">
-                Use the Manual Generator instantly without an account.
+                {t("home.manualNote", "Use the Manual Generator instantly without an account.")}
               </p>
               <p className="text-sm text-muted-foreground italic">
-                Upgrade for the Pro Manual Builder with assets, Ask Mode, saved palettes, and higher limits.
+                {t("home.proNote", "Upgrade for the Pro Manual Builder with assets, Ask Mode, saved palettes, and higher limits.")}
               </p>
             </div>
           </div>
@@ -454,9 +456,9 @@ export function HomePage({
         {/* Features Section with Builder Images */}
         <div className="mt-32 space-y-16">
           <div className="text-center space-y-4">
-            <h2 className="text-3xl md:text-4xl font-bold">Powerful Features for Creative Professionals</h2>
+            <h2 className="text-3xl md:text-4xl font-bold">{t("home.featuresTitle", "Powerful Features for Creative Professionals")}</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Everything you need to create, manage, and explore beautiful color palettes
+              {t("home.featuresText", "Everything you need to create, manage, and explore beautiful color palettes")}
             </p>
           </div>
 
@@ -478,10 +480,10 @@ export function HomePage({
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
-              <p className="text-xs uppercase tracking-[0.2em] text-primary/70 mb-2">Free</p>
-              <h3 className="text-xl font-semibold mb-2">Manual Generator</h3>
+              <p className="text-xs uppercase tracking-[0.2em] text-primary/70 mb-2">{t("home.freeBadge", "Free")}</p>
+              <h3 className="text-xl font-semibold mb-2">{t("home.freeBuilderTitle", "Manual Generator")}</h3>
               <p className="text-sm text-muted-foreground">
-                Start fast with the normal Manual Generator. Pick colors, lock favorites, regenerate, and export without creating an account.
+                {t("home.freeBuilderText", "Start fast with the normal Manual Generator. Pick colors, lock favorites, regenerate, and export without creating an account.")}
               </p>
             </div>
 
@@ -497,9 +499,9 @@ export function HomePage({
                   </div>
                 </div>
               </div>
-              <h3 className="text-xl font-semibold mb-2">AI Palette Generator</h3>
+              <h3 className="text-xl font-semibold mb-2">{t("home.aiBuilderTitle", "AI Palette Generator")}</h3>
               <p className="text-sm text-muted-foreground">
-                Describe your vision and let AI create stunning color palettes with detailed explanations for each color.
+                {t("home.aiBuilderText", "Describe your vision and let AI create stunning color palettes with detailed explanations for each color.")}
               </p>
             </div>
 
@@ -517,10 +519,10 @@ export function HomePage({
                   </div>
                 </div>
               </div>
-              <p className="text-xs uppercase tracking-[0.2em] text-primary/70 mb-2">Pro</p>
-              <h3 className="text-xl font-semibold mb-2">Pro Manual Builder</h3>
+              <p className="text-xs uppercase tracking-[0.2em] text-primary/70 mb-2">{t("home.proBadge", "Pro")}</p>
+              <h3 className="text-xl font-semibold mb-2">{t("home.proBuilderTitle", "Pro Manual Builder")}</h3>
               <p className="text-sm text-muted-foreground">
-                Need more power? Unlock assets, Ask Mode, palette saving, and advanced editing tools in the Pro Manual Builder.
+                {t("home.proBuilderText", "Need more power? Unlock assets, Ask Mode, palette saving, and advanced editing tools in the Pro Manual Builder.")}
               </p>
             </div>
           </div>
@@ -529,8 +531,8 @@ export function HomePage({
         {/* FAQ Section */}
         <div className="mt-32 space-y-12">
           <div className="text-center space-y-4">
-            <h2 className="text-3xl md:text-4xl font-bold">Frequently Asked Questions</h2>
-            <p className="text-muted-foreground">Everything you need to know about Colored In</p>
+            <h2 className="text-3xl md:text-4xl font-bold">{t("home.faqTitle", "Frequently Asked Questions")}</h2>
+            <p className="text-muted-foreground">{t("home.faqSubtitle", "Everything you need to know about Colored In")}</p>
           </div>
 
           <div className="max-w-3xl mx-auto space-y-6">
@@ -596,36 +598,36 @@ export function HomePage({
         steps={[
           {
             id: "welcome",
-            title: "Welcome to Colored In!",
-            description: "Create beautiful color palettes with AI or manually. Let us show you around!",
+            title: t("home.tourWelcomeTitle", "Welcome to Colored In!"),
+            description: t("home.tourWelcomeText", "Create beautiful color palettes with AI or manually. Let us show you around!"),
             selector: ".text-gradient",
             placement: "bottom",
           },
           {
             id: "ai-generate",
-            title: "AI Palette Generator",
-            description: "Click here to describe your vision and let AI create stunning palettes instantly.",
+            title: t("home.tourAiTitle", "AI Palette Generator"),
+            description: t("home.tourAiText", "Click here to describe your vision and let AI create stunning palettes instantly."),
             selector: "#home-ai-btn",
             placement: "bottom",
           },
           {
             id: "manual-gen",
-            title: "Manual Generator",
-            description: "Open the free Manual Generator right away. No account is needed for the normal builder.",
+            title: t("home.tourManualTitle", "Manual Generator"),
+            description: t("home.tourManualText", "Open the free Manual Generator right away. No account is needed for the normal builder."),
             selector: "#home-manual-btn",
             placement: "bottom",
           },
           {
             id: "browse",
-            title: "Explore Palettes",
-            description: "Browse over 50,000 curated color palettes for inspiration. Click any palette to see details!",
+            title: t("home.tourBrowseTitle", "Explore Palettes"),
+            description: t("home.tourBrowseText", "Browse over 50,000 curated color palettes for inspiration. Click any palette to see details."),
             selector: "#home-explore-btn",
             placement: "bottom",
           },
           {
             id: "pricing",
-            title: "Upgrade for More",
-            description: "Compare Pro plans if you want the Pro Manual Builder, assets, Ask Mode, saved palettes, and higher limits.",
+            title: t("home.tourPricingTitle", "Upgrade for More"),
+            description: t("home.tourPricingText", "Compare Pro plans if you want the Pro Manual Builder, assets, Ask Mode, saved palettes, and higher limits."),
             selector: "#home-pricing-btn",
             placement: "bottom",
           },

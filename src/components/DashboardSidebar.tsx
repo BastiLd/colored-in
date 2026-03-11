@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useLanguage } from "@/components/LanguageProvider";
 
 interface DashboardSidebarProps {
   profile: {
@@ -20,10 +21,11 @@ interface DashboardSidebarProps {
 
 export const DashboardSidebar = ({ profile, currentView, onViewChange }: DashboardSidebarProps) => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    toast.success("Signed out successfully");
+    toast.success(t("dashboard.signedOut", "Signed out successfully"));
     navigate("/");
   };
 
@@ -46,8 +48,8 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
             {profile?.email?.[0]?.toUpperCase() ?? "U"}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{profile?.email ?? "User"}</p>
-            <p className="text-xs text-muted-foreground capitalize">{profile?.plan} Plan</p>
+            <p className="text-sm font-medium truncate">{profile?.email ?? t("dashboard.user", "User")}</p>
+            <p className="text-xs text-muted-foreground capitalize">{profile?.plan} {t("dashboard.plan", "Plan")}</p>
           </div>
         </div>
       </div>
@@ -63,7 +65,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
           }`}
         >
           <Home className="h-5 w-5" />
-          <span>Home</span>
+          <span>{t("dashboard.home", "Home")}</span>
         </button>
 
         <button
@@ -75,7 +77,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
           }`}
         >
           <Palette className="h-5 w-5" />
-          <span>My Palettes</span>
+          <span>{t("dashboard.myPalettes", "My Palettes")}</span>
         </button>
 
         <button
@@ -87,7 +89,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
           }`}
         >
           <Upload className="h-5 w-5" />
-          <span>My Uploads</span>
+          <span>{t("dashboard.myUploads", "My Uploads")}</span>
         </button>
 
         <button
@@ -99,7 +101,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
           }`}
         >
           <Compass className="w-5 h-5" />
-          <span>Explore</span>
+          <span>{t("dashboard.explore", "Explore")}</span>
         </button>
 
         <div className="mt-4 pt-4 border-t border-border">
@@ -112,7 +114,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
             }`}
           >
             <BarChart3 className="h-5 w-5" />
-            <span>Usage</span>
+            <span>{t("dashboard.usage", "Usage")}</span>
           </button>
 
           <button
@@ -124,7 +126,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
             }`}
           >
             <CreditCard className="h-5 w-5" />
-            <span>Plan</span>
+            <span>{t("dashboard.plan", "Plan")}</span>
           </button>
         </div>
       </nav>
@@ -138,7 +140,7 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
                 {profile?.email?.[0]?.toUpperCase() ?? "U"}
               </div>
               <div className="flex-1 text-left min-w-0">
-                <p className="text-sm font-medium truncate">{profile?.email ?? "User"}</p>
+                <p className="text-sm font-medium truncate">{profile?.email ?? t("dashboard.user", "User")}</p>
               </div>
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -146,11 +148,11 @@ export const DashboardSidebar = ({ profile, currentView, onViewChange }: Dashboa
           <DropdownMenuContent align="start" className="w-56">
             <DropdownMenuItem onClick={() => navigate("/settings")}>
               <Settings className="h-4 w-4 mr-2" />
-              Safety Settings
+              {t("dashboard.safetySettings", "Safety Settings")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
               <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+              {t("dashboard.signOut", "Sign Out")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

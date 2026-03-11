@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { getRandomPalette, generateRandomColors } from "@/data/palettes";
 import { supabase } from "@/integrations/supabase/client";
 import { GuidedTour, type TourStep } from "@/components/GuidedTour";
+import { useLanguage } from "@/components/LanguageProvider";
 
 interface ColorSlot {
   color: string;
@@ -25,6 +26,7 @@ export function PaletteGenerator({
   showNewDesignButton,
   initialColors,
 }: PaletteGeneratorProps) {
+  const { t } = useLanguage();
   const [colorSlots, setColorSlots] = useState<ColorSlot[]>(() => {
     const sourceColors =
       initialColors && initialColors.length > 0 ? initialColors : getRandomPalette();
@@ -58,20 +60,20 @@ export function PaletteGenerator({
 
   const copyColor = useCallback((color: string) => {
     navigator.clipboard.writeText(color);
-    toast.success(`Copied ${color}`, {
+    toast.success(`${t("freeBuilder.copied", "Copied")} ${color}`, {
       duration: 1500,
       position: "bottom-center",
     });
-  }, []);
+  }, [t]);
 
   const copyAllColors = useCallback(() => {
     const colors = colorSlots.map(s => s.color).join(", ");
     navigator.clipboard.writeText(colors);
-    toast.success("Copied all colors!", {
+    toast.success(t("freeBuilder.copiedAll", "Copied all colors!"), {
       duration: 1500,
       position: "bottom-center",
     });
-  }, [colorSlots]);
+  }, [colorSlots, t]);
 
   const lockedColors = colorSlots.filter(s => s.locked).map(s => s.color);
   const canSave = lockedColors.length >= 3;
@@ -81,44 +83,44 @@ export function PaletteGenerator({
       {
         id: "palette",
         selector: '[data-tour="free-palette"]',
-        title: "Palette canvas",
-        description: "Click any color to copy it. Lock colors you want to keep, then regenerate.",
+        title: t("freeBuilder.tourPaletteTitle", "Palette canvas"),
+        description: t("freeBuilder.tourPaletteText", "Click any color to copy it. Lock colors you want to keep, then regenerate."),
         placement: "bottom",
       },
       {
         id: "save",
         selector: '[data-tour="free-save"]',
-        title: "Save your palette",
-        description: "Lock at least 3 colors to save your palette to My Palettes.",
+        title: t("freeBuilder.tourSaveTitle", "Save your palette"),
+        description: t("freeBuilder.tourSaveText", "Lock at least 3 colors to save your palette to My Palettes."),
         placement: "bottom",
       },
       {
         id: "export",
         selector: '[data-tour="free-export"]',
-        title: "Export colors",
-        description: "Copy all colors at once to use them in your designs.",
+        title: t("freeBuilder.tourExportTitle", "Export colors"),
+        description: t("freeBuilder.tourExportText", "Copy all colors at once to use them in your designs."),
         placement: "bottom",
       },
       {
         id: "browse",
         selector: '[data-tour="free-browse"]',
-        title: "Browse palettes",
-        description: "Explore curated palettes for inspiration and quick starts.",
+        title: t("freeBuilder.tourBrowseTitle", "Browse palettes"),
+        description: t("freeBuilder.tourBrowseText", "Explore curated palettes for inspiration and quick starts."),
         placement: "bottom",
       },
     ],
-    []
+    [t]
   );
 
   const savePalette = useCallback(async () => {
     if (!canSave) {
-      toast.error("Lock at least 3 colors to save", { duration: 2000 });
+      toast.error(t("freeBuilder.lockAtLeastThree", "Lock at least 3 colors to save"), { duration: 2000 });
       return;
     }
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
-      toast.error("Please log in to save palettes", { duration: 2000 });
+      toast.error(t("freeBuilder.loginToSave", "Please log in to save palettes"), { duration: 2000 });
       return;
     }
 
@@ -134,15 +136,15 @@ export function PaletteGenerator({
       });
 
     if (error) {
-      toast.error("Failed to save palette", { duration: 2000 });
+      toast.error(t("freeBuilder.failedSave", "Failed to save palette"), { duration: 2000 });
       return;
     }
 
-    toast.success(`Saved palette with ${lockedColors.length} colors!`, {
+    toast.success(t("freeBuilder.savedPalette", "Saved palette with {count} colors!").replace("{count}", String(lockedColors.length)), {
       duration: 2000,
       position: "bottom-center",
     });
-  }, [canSave, lockedColors]);
+  }, [canSave, lockedColors, t]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -180,7 +182,7 @@ export function PaletteGenerator({
               onClick={onNewDesign}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground bg-muted hover:bg-muted/80 rounded-lg transition-colors"
             >
-              New Builder
+              {t("freeBuilder.newBuilder", "New Builder")}
             </button>
           )}
 
@@ -193,10 +195,10 @@ export function PaletteGenerator({
                 ? "text-primary-foreground bg-primary hover:opacity-90 glow-primary" 
                 : "text-muted-foreground bg-muted cursor-not-allowed"
             }`}
-            title={canSave ? "Save locked colors as palette" : "Lock at least 3 colors to save"}
+            title={canSave ? t("freeBuilder.saveHint", "Save locked colors as palette") : t("freeBuilder.saveLockedHint", "Lock at least 3 colors to save")}
           >
             <Save className="w-4 h-4" />
-            Save ({lockedColors.length}/3+)
+            {t("freeBuilder.save", "Save")} ({lockedColors.length}/3+)
           </button>
 
           <button
@@ -205,7 +207,7 @@ export function PaletteGenerator({
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-secondary-foreground bg-secondary hover:bg-muted rounded-lg transition-colors"
           >
             <Copy className="w-4 h-4" />
-            Export
+            {t("freeBuilder.export", "Export")}
           </button>
           
           <button
@@ -213,7 +215,7 @@ export function PaletteGenerator({
             data-tour="free-browse"
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all glow-primary"
           >
-            Browse Palettes
+            {t("freeBuilder.browse", "Browse Palettes")}
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -283,7 +285,7 @@ export function PaletteGenerator({
           className="flex items-center gap-2 px-6 py-3 text-sm font-medium text-primary-foreground bg-primary hover:opacity-90 rounded-lg transition-all glow-primary"
         >
           <RefreshCw className="w-4 h-4" />
-          Generate
+          {t("freeBuilder.generate", "Generate")}
           <span className="ml-2 px-2 py-0.5 text-xs bg-primary-foreground/20 rounded">Space</span>
         </button>
       </footer>

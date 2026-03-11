@@ -162,6 +162,7 @@ export type Database = {
         Row: {
           user_id: string
           save_chat_history: boolean
+          language_preference: string
           last_activity: string
           created_at: string
           updated_at: string
@@ -169,6 +170,7 @@ export type Database = {
         Insert: {
           user_id: string
           save_chat_history?: boolean
+          language_preference?: string
           last_activity?: string
           created_at?: string
           updated_at?: string
@@ -176,6 +178,7 @@ export type Database = {
         Update: {
           user_id?: string
           save_chat_history?: boolean
+          language_preference?: string
           last_activity?: string
           created_at?: string
           updated_at?: string
