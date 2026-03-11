@@ -15,6 +15,7 @@ import { PaletteDetailModal } from "@/components/PaletteDetailModal";
 import { getPlanLimits } from "@/lib/planLimits";
 import { toast } from "sonner";
 import { GuidedTour, type TourStep } from "@/components/GuidedTour";
+import { useAccessState } from "@/hooks/useAccessState";
 
 type DashboardView = "home" | "my-palettes" | "uploads" | "generator" | "generator-old" | "usage" | "plan";
 
@@ -46,6 +47,7 @@ interface UserAsset {
 const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const access = useAccessState();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -368,10 +370,7 @@ const Dashboard = () => {
     );
   }
 
-  const isPaidPlan =
-    profile?.plan &&
-    profile.plan !== "free" &&
-    (profile.is_active ?? false);
+  const isPaidPlan = access.canUseProBuilder;
 
   const renderContent = () => {
     switch (currentView) {

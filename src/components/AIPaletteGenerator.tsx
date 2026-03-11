@@ -4,24 +4,16 @@ import { Send, X, Sparkles, Loader2, LogIn, Upload, Image as ImageIcon, Wand2 } 
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getFreePalettes, type Palette } from "@/data/palettes";
-import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { PaletteDetailModal } from "@/components/PaletteDetailModal";
+import { useAccessState } from "@/hooks/useAccessState";
 
 interface AIPaletteGeneratorProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-// Plan limits
-const PLAN_LIMITS: Record<string, number> = {
-  free: 1,
-  pro: 100,
-  ultra: 500,
-  individual: Infinity,
-};
 
 interface GeneratedPalette {
   name: string;
@@ -200,11 +192,12 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
   const [isLoading, setIsLoading] = useState(false);
   const [generatedPalette, setGeneratedPalette] = useState<GeneratedPalette | null>(null);
   const [hoveredColor, setHoveredColor] = useState<number | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [userPlan, setUserPlan] = useState<string>("free");
   const [generationCount, setGenerationCount] = useState(0);
   const [hasReachedLimit, setHasReachedLimit] = useState(false);
   const navigate = useNavigate();
+  const access = useAccessState();
+  const user = access.user;
+  const userPlan = access.plan;
   
   // Logo improvement feature (Pro+ only)
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -216,7 +209,8 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
   const [selectedPaletteForDetail, setSelectedPaletteForDetail] = useState<GeneratedPalette | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const isProPlus = userPlan === "pro" || userPlan === "ultra" || userPlan === "individual";
+  const generationLimit = access.limits.palettesPerMonth;
+  const isProPlus = access.canUseAssets;
   
   const allPalettes = useMemo(() => getFreePalettes(), []);
   
@@ -243,61 +237,48 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
   const orbitingLeft = generatedPalette ? leftSimilar : leftPalettes;
   const orbitingRight = generatedPalette ? rightSimilar : rightPalettes;
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
   const checkGenerationLimit = useCallback(async () => {
-    if (!user) return;
+    if (!access.user) return;
     
     const [genResult, subResult] = await Promise.all([
       supabase
         .from('user_ai_generations')
         .select('generation_count')
-        .eq('user_id', user.id)
+        .eq('user_id', access.user.id)
         .single(),
       supabase
         .from('user_subscriptions')
         .select('plan, is_active')
-        .eq('user_id', user.id)
+        .eq('user_id', access.user.id)
         .single()
     ]);
     
     const count = genResult.data?.generation_count || 0;
     const plan = (subResult.data?.is_active && subResult.data?.plan) || 'free';
-    const limit = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
+    const limit = access.plan === plan ? generationLimit : 1;
     
     setGenerationCount(count);
-    setUserPlan(plan);
     setHasReachedLimit(count >= limit);
-  }, [user]);
+  }, [access.plan, access.user, generationLimit]);
 
   useEffect(() => {
-    if (user) {
+    if (access.user) {
       checkGenerationLimit();
     }
-  }, [user, checkGenerationLimit]);
+  }, [access.user, checkGenerationLimit]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isLoading) return;
 
-    if (!user) {
+    if (access.isGuest) {
       toast.error("Please sign in to use AI palette generation");
       navigate("/auth");
       return;
     }
 
     if (hasReachedLimit) {
-      const message = userPlan === 'free' 
+      const message = access.isFree
         ? "You've used your free generation. Upgrade to Pro for more!"
         : "You've reached your plan limit. Upgrade for more generations!";
       toast.error(message);
@@ -372,7 +353,7 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
       setGeneratedPalette(normalizePaletteDescriptions(data));
       setGenerationCount(prev => prev + 1);
       // Check if new count reaches limit
-      const limit = PLAN_LIMITS[userPlan] ?? PLAN_LIMITS.free;
+      const limit = generationLimit;
       if (generationCount + 1 >= limit) {
         setHasReachedLimit(true);
       }
@@ -408,7 +389,7 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
   };
 
   const handleImproveLogo = async () => {
-    if (!logoFile || !user) return;
+    if (!logoFile || !access.user) return;
 
     setIsImproving(true);
     setImprovedPalette(null);
@@ -417,7 +398,7 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
       // Upload logo to storage
       const fileExt = logoFile.name.split(".").pop();
       const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${fileName}`;
+      const filePath = `${access.user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("user-assets")
@@ -551,19 +532,19 @@ export function AIPaletteGenerator({ isOpen, onClose }: AIPaletteGeneratorProps)
             <p className="text-sm text-muted-foreground mt-2">
               e.g. "Sunset over the ocean" or "Modern tech startup"
             </p>
-            {!user && (
+            {access.isGuest && (
               <p className="text-xs text-primary mt-2">
                 Sign in to get 1 free AI generation!
               </p>
             )}
-            {user && !hasReachedLimit && (
+            {access.user && !hasReachedLimit && (
               <p className="text-xs text-green-500 mt-2">
                 ✨ {userPlan === 'individual' 
                   ? 'Unlimited generations available!'
-                  : `${PLAN_LIMITS[userPlan] - generationCount} generations remaining (${userPlan} plan)`}
+                  : `${generationLimit - generationCount} generations remaining (${access.plan} plan)`}
               </p>
             )}
-            {user && hasReachedLimit && !generatedPalette && (
+            {access.user && hasReachedLimit && !generatedPalette && (
               <p className="text-xs text-orange-500 mt-2">
                 Limit reached. Upgrade for more generations!
               </p>

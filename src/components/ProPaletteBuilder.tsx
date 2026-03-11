@@ -63,6 +63,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { useAccessState } from "@/hooks/useAccessState";
 
 interface ColorSlot {
   color: string;
@@ -157,6 +158,7 @@ export function ProPaletteBuilder({
   onHome,
   onOldDesign,
 }: ProPaletteBuilderProps) {
+  const access = useAccessState();
   const [colorSlots, setColorSlots] = useState<ColorSlot[]>(
     DEFAULT_COLORS.map((c) => ({ color: c, locked: false }))
   );
@@ -543,8 +545,7 @@ export function ProPaletteBuilder({
     if (!chatInput.trim()) return;
     
     // Check if user has access to Ask Mode
-    const planLimits = getPlanLimits(userPlan);
-    if (!planLimits.features.askMode) {
+    if (!access.canUseAskMode) {
       toast.error("You need a Pro plan or higher to use Ask Mode", { position: TOAST_POSITION });
       return;
     }
@@ -614,7 +615,7 @@ export function ProPaletteBuilder({
     } finally {
       setIsLoadingChat(false);
     }
-  }, [chatInput, colorSlots, userPlan, chatUsed, chatLimit]);
+  }, [access.canUseAskMode, chatInput, colorSlots, chatUsed, chatLimit]);
 
   // FIX: Only copy color when C is pressed WITHOUT Ctrl/Cmd
   useEffect(() => {
@@ -817,7 +818,7 @@ export function ProPaletteBuilder({
             </div>
           )}
           {sidebarTab === "assets" && (
-            userId ? (
+            access.canUseAssets && userId ? (
               <div data-tour="pro-assets">
                 <AssetsPanel 
                   userId={userId} 
@@ -832,7 +833,9 @@ export function ProPaletteBuilder({
               </div>
             ) : (
               <div className="text-sm text-muted-foreground">
-                Sign in to manage assets.
+                {access.isGuest
+                  ? "Sign in to manage assets."
+                  : "Upgrade to Pro to unlock assets."}
               </div>
             )
           )}

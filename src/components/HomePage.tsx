@@ -4,10 +4,10 @@ import { toast } from "sonner";
 import { getFreePalettes, type Palette } from "@/data/palettes";
 import { AIPaletteGenerator } from "./AIPaletteGenerator";
 import { supabase } from "@/integrations/supabase/client";
-import { User } from "@supabase/supabase-js";
 import { LogOut, User as UserIcon, Sparkles, Palette as PaletteIcon, Image as ImageIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GuidedTour } from "./GuidedTour";
+import { useAccessState } from "@/hooks/useAccessState";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -319,61 +319,9 @@ export function HomePage({
   const palettes = useMemo(() => getFreePalettes().slice(0, 12), []);
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [userPlan, setUserPlan] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const access = useAccessState();
   const featuredPalette = palettes[featuredIndex];
   const palettesReady = palettes.length > 0;
-
-  // Auth state
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          supabase
-            .from('user_subscriptions')
-            .select('plan, is_active')
-            .eq('user_id', session.user.id)
-            .single()
-            .then(({ data }) => {
-              if (data?.is_active && data?.plan) {
-                setUserPlan(data.plan);
-              } else {
-                setUserPlan('free');
-              }
-              setAuthLoading(false);
-            });
-        } else {
-          setUserPlan(null);
-          setAuthLoading(false);
-        }
-      }
-    );
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        supabase
-          .from('user_subscriptions')
-          .select('plan, is_active')
-          .eq('user_id', session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data?.is_active && data?.plan) {
-              setUserPlan(data.plan);
-            } else {
-              setUserPlan('free');
-            }
-            setAuthLoading(false);
-          });
-      } else {
-        setAuthLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
 
   // Rotate featured palette
   useEffect(() => {
@@ -390,8 +338,7 @@ export function HomePage({
 
   // Handle Manual Generator click with plan check
   const handleManualGenerator = () => {
-    const paidPlans = ['pro', 'ultra', 'individual'];
-    if (user && userPlan && paidPlans.includes(userPlan.toLowerCase())) {
+    if (access.canUseProBuilder) {
       // Has Pro+ plan - go directly to the dashboard's generator view (Pro Builder)
       navigate("/dashboard?view=generator");
     } else {
@@ -408,9 +355,9 @@ export function HomePage({
           <button id="home-pricing-btn" onClick={() => navigate("/pricing")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Go Pro
           </button>
-          {authLoading ? (
+          {access.isLoading ? (
             <Skeleton className="w-24 h-9 rounded-lg" />
-          ) : !user ? (
+          ) : access.isGuest ? (
             <>
               <button onClick={() => navigate("/auth")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
                 Sign in
@@ -428,12 +375,12 @@ export function HomePage({
       </header>
 
       {/* Profile icon in bottom left when logged in */}
-      {user && (
+      {access.user && (
         <div className="fixed bottom-6 left-6 z-50">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-semibold text-lg shadow-lg hover:opacity-90 transition-opacity">
-                {user.email?.[0]?.toUpperCase() ?? <UserIcon className="h-5 w-5" />}
+                {access.user.email?.[0]?.toUpperCase() ?? <UserIcon className="h-5 w-5" />}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" side="top" className="w-48">

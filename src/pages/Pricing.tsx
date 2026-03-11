@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Check, Sparkles, Zap, Crown, Rocket, ArrowLeft, Loader2 } from "lucide-react";
 import { supabase, supabaseConfig } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAccessState } from "@/hooks/useAccessState";
 
 interface PlanFeature {
   text: string;
@@ -226,33 +227,11 @@ function PlanCard({ plan, isActive, onSubscribe, isLoading, loadingPlan, isLogge
 export default function Pricing() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [userPlan, setUserPlan] = useState<string>("free");
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const access = useAccessState();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setIsLoggedIn(true);
-        const { data: subscriptionData } = await supabase
-          .from("user_subscriptions")
-          .select("plan")
-          .eq("user_id", session.user.id)
-          .single();
-        
-        if (subscriptionData?.plan) {
-          setUserPlan(subscriptionData.plan);
-        } else {
-          setUserPlan("free");
-        }
-      } else {
-        setUserPlan("free");
-      }
-    };
-    checkUser();
-
     // Check for checkout status from URL
     const checkoutStatus = searchParams.get("checkout");
     if (checkoutStatus === "canceled") {
@@ -262,11 +241,11 @@ export default function Pricing() {
 
   const handleSubscribe = async (planKey: string) => {
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:264',message:'handleSubscribe called',data:{planKey,isLoggedIn},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/4dbc215f-e85a-47d5-88db-cdaf6c66d6aa',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'Pricing.tsx:264',message:'handleSubscribe called',data:{planKey,isLoggedIn:!access.isGuest},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
     
     // If not logged in, redirect to auth
-    if (!isLoggedIn) {
+    if (access.isGuest) {
       toast.info("Please sign in to subscribe to a plan.");
       navigate("/auth");
       return;
@@ -378,7 +357,7 @@ export default function Pricing() {
       <header className="flex items-center justify-between px-6 py-4 border-b border-border">
         <button
           onClick={() => {
-            if (isLoggedIn) {
+            if (!access.isGuest) {
               navigate("/dashboard");
             } else {
               navigate("/");
@@ -390,7 +369,7 @@ export default function Pricing() {
           <span className="text-xl font-bold text-gradient font-display">Colored In</span>
         </button>
         <nav className="flex items-center gap-4">
-          {isLoggedIn ? (
+          {!access.isGuest ? (
             <button
               onClick={() => navigate("/dashboard")}
               className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
@@ -441,11 +420,11 @@ export default function Pricing() {
             <PlanCard
               key={plan.name}
               plan={plan}
-              isActive={userPlan === plan.planKey}
+              isActive={access.plan === plan.planKey}
               onSubscribe={handleSubscribe}
               isLoading={isLoading}
               loadingPlan={loadingPlan}
-              isLoggedIn={isLoggedIn}
+              isLoggedIn={!access.isGuest}
             />
           ))}
         </div>
